@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>系統優化紀錄</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛠️</text></svg>">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
+<script src="config.js"></script>
+<style>
+  :root{
+    --bg:#f4f6fb; --card:#fff; --ink:#1e2433; --muted:#6b7488;
+    --line:#e6e9f0; --brand:#3b5bdb; --brand-d:#2f49b0; --brand-l:#edf0fd;
+    --danger:#e03131; --ok:#2f9e44; --shadow:0 1px 3px rgba(20,30,60,.08),0 8px 24px rgba(20,30,60,.06);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:"Segoe UI","Microsoft JhengHei",system-ui,sans-serif;background:var(--bg);color:var(--ink);}
+  button{font-family:inherit;cursor:pointer;border:none;border-radius:8px;font-size:14px;padding:9px 16px;transition:.15s}
+  input,select,textarea{font-family:inherit;font-size:14px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);width:100%}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-l)}
+  .btn-primary{background:var(--brand);color:#fff;font-weight:600}
+  .btn-primary:hover{background:var(--brand-d)}
+  .btn-ghost{background:#fff;border:1px solid var(--line);color:var(--ink)}
+  .btn-ghost:hover{border-color:var(--brand);color:var(--brand)}
+  .btn-danger{background:#fff;border:1px solid var(--line);color:var(--danger)}
+  .btn-danger:hover{background:var(--danger);color:#fff;border-color:var(--danger)}
+  .hidden{display:none!important}
+
+  /* ---- Login ---- */
+  #loginView{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+  .login-card{background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:36px 32px;width:100%;max-width:380px}
+  .login-card h1{margin:0 0 4px;font-size:22px}
+  .login-card p.sub{margin:0 0 24px;color:var(--muted);font-size:14px}
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+  .login-card button{width:100%;margin-top:6px}
+  .switch{text-align:center;margin-top:16px;font-size:13px;color:var(--muted)}
+  .switch a{color:var(--brand);cursor:pointer;text-decoration:none;font-weight:600}
+  .msg{font-size:13px;padding:10px 12px;border-radius:8px;margin-top:12px}
+  .msg.err{background:#fff0f0;color:var(--danger)}
+  .msg.ok{background:#ebfbee;color:var(--ok)}
+
+  /* ---- App shell ---- */
+  header{background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:10}
+  .hwrap{max-width:1080px;margin:0 auto;padding:14px 24px;display:flex;align-items:center;gap:12px}
+  .logo{font-size:20px;font-weight:700;display:flex;align-items:center;gap:8px}
+  .logo .badge{background:var(--brand);color:#fff;width:32px;height:32px;border-radius:9px;display:grid;place-items:center;font-size:18px}
+  .spacer{flex:1}
+  .who{font-size:13px;color:var(--muted)}
+  main{max-width:1080px;margin:0 auto;padding:24px}
+
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;background:var(--card);padding:16px;border-radius:12px;box-shadow:var(--shadow);margin-bottom:18px}
+  .toolbar .f{display:flex;flex-direction:column;gap:5px}
+  .toolbar .f label{font-size:12px;color:var(--muted)}
+  .toolbar .grow{flex:1;min-width:180px}
+  .toolbar input,.toolbar select{min-width:130px}
+
+  .stats{display:flex;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+  .stat{background:var(--card);border-radius:12px;box-shadow:var(--shadow);padding:14px 18px;flex:1;min-width:130px}
+  .stat .n{font-size:24px;font-weight:700}
+  .stat .l{font-size:12px;color:var(--muted);margin-top:2px}
+
+  .list{display:flex;flex-direction:column;gap:12px}
+  .rec{background:var(--card);border-radius:12px;box-shadow:var(--shadow);padding:16px 18px;border-left:4px solid var(--brand)}
+  .rec .top{display:flex;align-items:flex-start;gap:10px}
+  .rec .cat{background:var(--brand-l);color:var(--brand-d);font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px;white-space:nowrap}
+  .rec h3{margin:0;font-size:16px;flex:1}
+  .rec .date{font-size:12px;color:var(--muted);white-space:nowrap}
+  .rec .desc{margin:10px 0 0;color:#3c4356;font-size:14px;line-height:1.6;white-space:pre-wrap}
+  .rec .meta{display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;font-size:13px;color:var(--muted);align-items:center}
+  .rec .meta a{color:var(--brand);text-decoration:none}
+  .rec .meta a:hover{text-decoration:underline}
+  .rec .acts{display:flex;gap:8px;margin-top:12px}
+  .rec .acts button{padding:6px 12px;font-size:13px}
+  .empty{text-align:center;color:var(--muted);padding:60px 20px}
+
+  /* ---- Modal ---- */
+  .overlay{position:fixed;inset:0;background:rgba(20,26,45,.45);display:flex;align-items:center;justify-content:center;padding:20px;z-index:50}
+  .modal{background:var(--card);border-radius:16px;box-shadow:var(--shadow);width:100%;max-width:560px;max-height:90vh;overflow:auto;padding:26px}
+  .modal h2{margin:0 0 20px;font-size:19px}
+  .modal .field label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+  .modal .row{display:flex;gap:12px}
+  .modal .row .field{flex:1}
+  .modal-acts{display:flex;justify-content:flex-end;gap:10px;margin-top:22px}
+  textarea{resize:vertical;min-height:90px}
+  .req{color:var(--danger)}
+
+  @media(max-width:600px){
+    .modal .row{flex-direction:column;gap:0}
+    .hwrap,main{padding-left:14px;padding-right:14px}
+  }
+</style>
+</head>
+<body>
+
+<!-- ========== 登入畫面 ========== -->
+<div id="loginView">
+  <div class="login-card">
+    <h1>🛠️ 系統優化紀錄</h1>
+    <p class="sub" id="loginSub">請登入以繼續</p>
+    <div class="field">
+      <label>Email</label>
+      <input type="email" id="email" placeholder="you@example.com" autocomplete="username">
+    </div>
+    <div class="field">
+      <label>密碼</label>
+      <input type="password" id="password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="btn-primary" id="authBtn">登入</button>
+    <div class="switch" id="switchWrap">
+      還沒有帳號？<a id="switchLink">註冊</a>
+    </div>
+    <div id="loginMsg"></div>
+  </div>
+</div>
+
+<!-- ========== 主應用 ========== -->
+<div id="appView" class="hidden">
+  <header>
+    <div class="hwrap">
+      <div class="logo"><span class="badge">🛠️</span> 系統優化紀錄</div>
+      <div class="spacer"></div>
+      <span class="who" id="who"></span>
+      <button class="btn-ghost" id="logoutBtn">登出</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- 查詢工具列 -->
+    <div class="toolbar">
+      <div class="f grow">
+        <label>關鍵字（標題 / 說明）</label>
+        <input type="text" id="qKeyword" placeholder="輸入關鍵字…">
+      </div>
+      <div class="f">
+        <label>系統分類</label>
+        <select id="qCategory"><option value="">全部</option></select>
+      </div>
+      <div class="f">
+        <label>起始日期</label>
+        <input type="date" id="qFrom">
+      </div>
+      <div class="f">
+        <label>結束日期</label>
+        <input type="date" id="qTo">
+      </div>
+      <div class="f">
+        <label>&nbsp;</label>
+        <button class="btn-ghost" id="clearBtn">清除</button>
+      </div>
+      <div class="f">
+        <label>&nbsp;</label>
+        <button class="btn-primary" id="newBtn">＋ 新增紀錄</button>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><div class="n" id="stTotal">0</div><div class="l">符合筆數</div></div>
+      <div class="stat"><div class="n" id="stCats">0</div><div class="l">系統分類數</div></div>
+      <div class="stat" style="flex:2;display:flex;align-items:center;justify-content:flex-end;gap:10px">
+        <button class="btn-ghost" id="pdfListBtn">📄 匯出清單 PDF</button>
+      </div>
+    </div>
+
+    <div class="list" id="list"></div>
+  </main>
+</div>
+
+<!-- ========== 新增/編輯 Modal ========== -->
+<div class="overlay hidden" id="editOverlay">
+  <div class="modal">
+    <h2 id="modalTitle">新增優化紀錄</h2>
+    <input type="hidden" id="fId">
+    <div class="row">
+      <div class="field">
+        <label>系統分類 <span class="req">*</span></label>
+        <input type="text" id="fCategory" list="catList" placeholder="例：Lu coffee">
+        <datalist id="catList"></datalist>
+      </div>
+      <div class="field">
+        <label>更版日期</label>
+        <input type="date" id="fDate">
+      </div>
+    </div>
+    <div class="field">
+      <label>標題 <span class="req">*</span></label>
+      <input type="text" id="fTitle" placeholder="優化項目名稱">
+    </div>
+    <div class="field">
+      <label>說明（做了什麼）</label>
+      <textarea id="fDesc" placeholder="這次優化的內容、原因、成效…"></textarea>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>需求書連結（網址）</label>
+        <input type="url" id="fUrl" placeholder="https://…">
+      </div>
+      <div class="field">
+        <label>執行人</label>
+        <input type="text" id="fExec" placeholder="姓名">
+      </div>
+    </div>
+    <div id="modalMsg"></div>
+    <div class="modal-acts">
+      <button class="btn-ghost" id="cancelBtn">取消</button>
+      <button class="btn-primary" id="saveBtn">儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- PDF 匯出用隱藏容器 -->
+<div id="pdfArea" style="position:fixed;left:-9999px;top:0"></div>
+
+<script>
+// ================= Supabase 初始化 =================
+const cfg = window.SUPABASE_CONFIG || {};
+let sb = null;
+try {
+  sb = supabase.createClient(cfg.url, cfg.anonKey);
+} catch(e){}
+
+const $ = id => document.getElementById(id);
+let ALL = [];          // 全部紀錄
+let CURRENT_USER = null;
+let signupMode = false;
+
+// ================= 登入邏輯 =================
+function setLoginMsg(txt, type){
+  const el = $("loginMsg");
+  el.className = "msg " + (type||"");
+  el.textContent = txt || "";
+  if(!txt) el.className = "";
+}
+
+// 用事件委派處理「登入 / 註冊」切換（innerHTML 會換掉元素，故綁在 document 上）
+document.addEventListener("click", e=>{
+  if(e.target && e.target.id === "switchLink") {
+    signupMode = !signupMode;
+    $("loginSub").textContent = signupMode ? "建立你的帳號" : "請登入以繼續";
+    $("authBtn").textContent  = signupMode ? "註冊" : "登入";
+    $("switchWrap").innerHTML = signupMode
+      ? '已經有帳號了？<a id="switchLink">登入</a>'
+      : '還沒有帳號？<a id="switchLink">註冊</a>';
+    setLoginMsg("");
+  }
+});
+
+$("authBtn").addEventListener("click", async ()=>{
+  const email = $("email").value.trim();
+  const pw    = $("password").value;
+  if(!email || !pw){ setLoginMsg("請輸入 Email 與密碼","err"); return; }
+  if(!sb){ setLoginMsg("尚未設定 Supabase，請先編輯 config.js","err"); return; }
+  $("authBtn").disabled = true;
+  try{
+    if(signupMode){
+      const {error} = await sb.auth.signUp({email, password:pw});
+      if(error) throw error;
+      setLoginMsg("註冊成功！若有開啟信箱驗證請先收信驗證，然後登入。","ok");
+      signupMode = false; $("authBtn").textContent="登入"; $("loginSub").textContent="請登入以繼續";
+    } else {
+      const {error} = await sb.auth.signInWithPassword({email, password:pw});
+      if(error) throw error;
+    }
+  }catch(err){
+    setLoginMsg(translateErr(err.message), "err");
+  }finally{
+    $("authBtn").disabled = false;
+  }
+});
+
+$("password").addEventListener("keydown", e=>{ if(e.key==="Enter") $("authBtn").click(); });
+
+function translateErr(m){
+  if(/Invalid login/i.test(m)) return "帳號或密碼錯誤";
+  if(/already registered/i.test(m)) return "此 Email 已註冊，請直接登入";
+  if(/at least 6/i.test(m)) return "密碼至少需 6 個字元";
+  if(/Email not confirmed/i.test(m)) return "Email 尚未驗證，請先收信驗證";
+  return m;
+}
+
+$("logoutBtn").addEventListener("click", async ()=>{ await sb.auth.signOut(); });
+
+// 監聽登入狀態
+if(sb){
+  sb.auth.onAuthStateChange((_ev, session)=>{
+    if(session && session.user){ enterApp(session.user); }
+    else { leaveApp(); }
+  });
+  sb.auth.getSession().then(({data})=>{
+    if(data.session) enterApp(data.session.user);
+  });
+} else {
+  setLoginMsg("尚未設定 Supabase，請先編輯 config.js 填入 url 與 anonKey","err");
+}
+
+function enterApp(user){
+  CURRENT_USER = user;
+  $("loginView").classList.add("hidden");
+  $("appView").classList.remove("hidden");
+  $("who").textContent = user.email;
+  loadData();
+}
+function leaveApp(){
+  CURRENT_USER = null; ALL = [];
+  $("appView").classList.add("hidden");
+  $("loginView").classList.remove("hidden");
+  $("password").value = "";
+}
+
+// ================= 資料讀取 =================
+async function loadData(){
+  const {data, error} = await sb.from("optimizations")
+    .select("*").order("release_date",{ascending:false, nullsFirst:false})
+    .order("created_at",{ascending:false});
+  if(error){ alert("讀取失敗："+error.message); return; }
+  ALL = data || [];
+  refreshCategoryOptions();
+  render();
+}
+
+function refreshCategoryOptions(){
+  const cats = [...new Set(ALL.map(r=>r.category).filter(Boolean))].sort();
+  const sel = $("qCategory");
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">全部</option>' + cats.map(c=>`<option>${esc(c)}</option>`).join("");
+  sel.value = cur;
+  $("catList").innerHTML = cats.map(c=>`<option value="${esc(c)}">`).join("");
+}
+
+// ================= 篩選 + 渲染 =================
+function getFiltered(){
+  const kw = $("qKeyword").value.trim().toLowerCase();
+  const cat = $("qCategory").value;
+  const from = $("qFrom").value;
+  const to   = $("qTo").value;
+  return ALL.filter(r=>{
+    if(cat && r.category !== cat) return false;
+    if(from && (!r.release_date || r.release_date < from)) return false;
+    if(to   && (!r.release_date || r.release_date > to)) return false;
+    if(kw){
+      const hay = ((r.title||"")+" "+(r.description||"")).toLowerCase();
+      if(!hay.includes(kw)) return false;
+    }
+    return true;
+  });
+}
+
+function render(){
+  const rows = getFiltered();
+  $("stTotal").textContent = rows.length;
+  $("stCats").textContent = new Set(ALL.map(r=>r.category)).size;
+  const list = $("list");
+  if(rows.length === 0){
+    list.innerHTML = '<div class="empty">目前沒有符合條件的紀錄。<br>點右上「＋ 新增紀錄」開始建立。</div>';
+    return;
+  }
+  list.innerHTML = rows.map(r=>`
+    <div class="rec">
+      <div class="top">
+        <span class="cat">${esc(r.category||"未分類")}</span>
+        <h3>${esc(r.title||"")}</h3>
+        <span class="date">${r.release_date||"—"}</span>
+      </div>
+      ${r.description?`<div class="desc">${esc(r.description)}</div>`:""}
+      <div class="meta">
+        ${r.executor?`<span>👤 ${esc(r.executor)}</span>`:""}
+        ${r.requirement_url?`<span>🔗 <a href="${esc(r.requirement_url)}" target="_blank" rel="noopener">需求書</a></span>`:""}
+      </div>
+      <div class="acts">
+        <button class="btn-ghost" onclick="openEdit('${r.id}')">編輯</button>
+        <button class="btn-ghost" onclick="exportOne('${r.id}')">📄 匯出 PDF</button>
+        <button class="btn-danger" onclick="delRec('${r.id}')">刪除</button>
+      </div>
+    </div>`).join("");
+}
+
+["qKeyword","qCategory","qFrom","qTo"].forEach(id=> $(id).addEventListener("input", render));
+$("clearBtn").addEventListener("click", ()=>{
+  $("qKeyword").value=""; $("qCategory").value=""; $("qFrom").value=""; $("qTo").value="";
+  render();
+});
+
+// ================= 新增 / 編輯 =================
+$("newBtn").addEventListener("click", ()=> openEdit(null));
+$("cancelBtn").addEventListener("click", closeModal);
+$("editOverlay").addEventListener("click", e=>{ if(e.target.id==="editOverlay") closeModal(); });
+
+function openEdit(id){
+  const r = id ? ALL.find(x=>x.id===id) : null;
+  $("modalTitle").textContent = r ? "編輯優化紀錄" : "新增優化紀錄";
+  $("fId").value       = r ? r.id : "";
+  $("fCategory").value = r ? (r.category||"") : "";
+  $("fDate").value     = r ? (r.release_date||"") : "";
+  $("fTitle").value    = r ? (r.title||"") : "";
+  $("fDesc").value     = r ? (r.description||"") : "";
+  $("fUrl").value      = r ? (r.requirement_url||"") : "";
+  $("fExec").value     = r ? (r.executor||"") : "";
+  $("modalMsg").innerHTML = "";
+  refreshCategoryOptions();
+  $("editOverlay").classList.remove("hidden");
+  $("fTitle").focus();
+}
+function closeModal(){ $("editOverlay").classList.add("hidden"); }
+
+$("saveBtn").addEventListener("click", async ()=>{
+  const cat = $("fCategory").value.trim();
+  const title = $("fTitle").value.trim();
+  if(!cat || !title){
+    $("modalMsg").innerHTML = '<div class="msg err">系統分類與標題為必填</div>';
+    return;
+  }
+  const payload = {
+    category: cat,
+    title,
+    description: $("fDesc").value.trim() || null,
+    release_date: $("fDate").value || null,
+    requirement_url: $("fUrl").value.trim() || null,
+    executor: $("fExec").value.trim() || null,
+    user_id: CURRENT_USER.id
+  };
+  $("saveBtn").disabled = true;
+  const id = $("fId").value;
+  let error;
+  if(id){
+    ({error} = await sb.from("optimizations").update(payload).eq("id", id));
+  } else {
+    ({error} = await sb.from("optimizations").insert(payload));
+  }
+  $("saveBtn").disabled = false;
+  if(error){ $("modalMsg").innerHTML = `<div class="msg err">儲存失敗：${esc(error.message)}</div>`; return; }
+  closeModal();
+  await loadData();
+});
+
+async function delRec(id){
+  const r = ALL.find(x=>x.id===id);
+  if(!confirm(`確定刪除「${r?r.title:""}」這筆紀錄？`)) return;
+  const {error} = await sb.from("optimizations").delete().eq("id", id);
+  if(error){ alert("刪除失敗："+error.message); return; }
+  await loadData();
+}
+
+// ================= PDF 匯出 =================
+function pdfStyle(){
+  return `
+  <style>
+    *{font-family:"Microsoft JhengHei","PMingLiU",sans-serif;color:#1e2433}
+    .doc{padding:8px 4px}
+    .doc h1{font-size:20px;margin:0 0 4px;border-bottom:3px solid #3b5bdb;padding-bottom:8px}
+    .doc .gen{font-size:11px;color:#888;margin:4px 0 18px}
+    .item{border:1px solid #e0e4ee;border-radius:8px;padding:12px 14px;margin-bottom:12px;page-break-inside:avoid}
+    .item .h{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+    .item .cat{background:#edf0fd;color:#2f49b0;font-size:11px;font-weight:bold;padding:2px 8px;border-radius:10px}
+    .item h2{font-size:15px;margin:6px 0 0}
+    .item .d{font-size:12px;color:#666}
+    .item .desc{font-size:12.5px;line-height:1.6;margin:8px 0 0;white-space:pre-wrap;color:#33384a}
+    .item .meta{font-size:11.5px;color:#666;margin-top:8px}
+    .item .meta a{color:#3b5bdb;text-decoration:none}
+    table{width:100%;border-collapse:collapse;font-size:12.5px}
+    td{padding:6px 8px;border:1px solid #e0e4ee;vertical-align:top}
+    td.k{background:#f6f8fd;color:#666;width:96px;font-weight:bold}
+  </style>`;
+}
+function itemBlock(r){
+  return `<div class="item">
+    <div class="h"><span class="cat">${esc(r.category||"未分類")}</span>
+      <span class="d">更版：${r.release_date||"—"}</span></div>
+    <h2>${esc(r.title||"")}</h2>
+    ${r.description?`<div class="desc">${esc(r.description)}</div>`:""}
+    <div class="meta">
+      ${r.executor?`執行人：${esc(r.executor)}　`:""}
+      ${r.requirement_url?`需求書：<a href="${esc(r.requirement_url)}">${esc(r.requirement_url)}</a>`:""}
+    </div>
+  </div>`;
+}
+
+function runPdf(html, filename){
+  const area = $("pdfArea");
+  area.innerHTML = pdfStyle() + `<div class="doc">${html}</div>`;
+  html2pdf().set({
+    margin:[12,12,14,12],
+    filename,
+    image:{type:"jpeg",quality:0.98},
+    html2canvas:{scale:2,useCORS:true},
+    jsPDF:{unit:"mm",format:"a4",orientation:"portrait"},
+    pagebreak:{mode:["css","legacy"]}
+  }).from(area).save().then(()=>{ area.innerHTML=""; });
+}
+
+function exportOne(id){
+  const r = ALL.find(x=>x.id===id);
+  if(!r) return;
+  const body = `<h1>系統優化紀錄</h1>
+    <div class="gen">產生時間：${new Date().toLocaleString("zh-TW")}</div>
+    <table>
+      <tr><td class="k">系統分類</td><td>${esc(r.category||"—")}</td></tr>
+      <tr><td class="k">標題</td><td>${esc(r.title||"—")}</td></tr>
+      <tr><td class="k">更版日期</td><td>${r.release_date||"—"}</td></tr>
+      <tr><td class="k">執行人</td><td>${esc(r.executor||"—")}</td></tr>
+      <tr><td class="k">需求書</td><td>${r.requirement_url?`<a href="${esc(r.requirement_url)}">${esc(r.requirement_url)}</a>`:"—"}</td></tr>
+      <tr><td class="k">說明</td><td style="white-space:pre-wrap">${esc(r.description||"—")}</td></tr>
+    </table>`;
+  runPdf(body, `優化紀錄_${safe(r.category)}_${safe(r.title)}.pdf`);
+}
+
+$("pdfListBtn").addEventListener("click", ()=>{
+  const rows = getFiltered();
+  if(rows.length===0){ alert("目前沒有可匯出的紀錄"); return; }
+  const cat = $("qCategory").value;
+  const sub = [
+    cat?`分類：${cat}`:"全部分類",
+    ($("qFrom").value||$("qTo").value)?`期間：${$("qFrom").value||"…"} ~ ${$("qTo").value||"…"}`:"",
+    $("qKeyword").value?`關鍵字：${$("qKeyword").value}`:""
+  ].filter(Boolean).join("　｜　");
+  const body = `<h1>系統優化紀錄 — 清單報告</h1>
+    <div class="gen">產生時間：${new Date().toLocaleString("zh-TW")}　｜　共 ${rows.length} 筆<br>${esc(sub)}</div>
+    ${rows.map(itemBlock).join("")}`;
+  runPdf(body, `優化紀錄清單_${new Date().toISOString().slice(0,10)}.pdf`);
+});
+
+// ================= 工具 =================
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));}
+function safe(s){return String(s||"").replace(/[\\/:*?"<>|]/g,"_").slice(0,30);}
+window.openEdit = openEdit;
+window.exportOne = exportOne;
+window.delRec = delRec;
+</script>
+</body>
+</html>
