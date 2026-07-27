@@ -90,6 +90,13 @@
   .modal-acts{display:flex;justify-content:flex-end;gap:10px;margin-top:22px}
   textarea{resize:vertical;min-height:90px}
   .req{color:var(--danger)}
+  .chips{display:flex;gap:8px;flex-wrap:wrap}
+  .chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:20px;padding:7px 15px;cursor:pointer;font-size:14px;user-select:none;background:#fff}
+  .chip input{width:auto;margin:0}
+  .chip:has(input:checked){background:var(--brand-l);border-color:var(--brand);color:var(--brand-d);font-weight:600}
+  .rec .venue{background:#f3f0ff;color:#5f3dc4;font-size:12px;font-weight:600;padding:2px 8px;border-radius:6px}
+  .ro-badge{background:#fff4e6;color:#d9480f;font-size:12px;font-weight:600;padding:4px 10px;border-radius:20px}
+  body.readonly #newBtn, body.readonly .rec .acts{display:none!important}
 
   @media(max-width:600px){
     .modal .row{flex-direction:column;gap:0}
@@ -123,6 +130,7 @@
     <div class="hwrap">
       <div class="logo"><span class="badge">🛠️</span> 系統優化紀錄</div>
       <div class="spacer"></div>
+      <span class="ro-badge hidden" id="roBadge">🔒 唯讀模式</span>
       <span class="who" id="who"></span>
       <button class="btn-ghost" id="logoutBtn">登出</button>
     </div>
@@ -186,6 +194,14 @@
       </div>
     </div>
     <div class="field">
+      <label>場地（可複選）</label>
+      <div class="chips" id="fVenues">
+        <label class="chip"><input type="checkbox" value="CB"> CB</label>
+        <label class="chip"><input type="checkbox" value="MX"> MX</label>
+        <label class="chip"><input type="checkbox" value="siv"> siv</label>
+      </div>
+    </div>
+    <div class="field">
       <label>標題 <span class="req">*</span></label>
       <input type="text" id="fTitle" placeholder="優化項目名稱">
     </div>
@@ -239,6 +255,7 @@ try {
 const $ = id => document.getElementById(id);
 let ALL = [];          // 全部紀錄
 let CURRENT_USER = null;
+let IS_OWNER = true;
 
 // ================= 登入邏輯 =================
 function setLoginMsg(txt, type){
@@ -291,6 +308,11 @@ if(sb){
 
 function enterApp(user){
   CURRENT_USER = user;
+  // 判斷是否為擁有者（可編輯）。ownerEmails 留空 = 所有人可編輯
+  const owners = ((window.APP_CONFIG && window.APP_CONFIG.ownerEmails) || []).map(e=>String(e).toLowerCase());
+  IS_OWNER = owners.length === 0 || owners.includes(String(user.email).toLowerCase());
+  document.body.classList.toggle("readonly", !IS_OWNER);
+  $("roBadge").classList.toggle("hidden", IS_OWNER);
   $("loginView").classList.add("hidden");
   $("appView").classList.remove("hidden");
   $("who").textContent = user.email;
@@ -367,6 +389,7 @@ function render(){
       <div class="top">
         <span class="cat">${esc(r.category||"未分類")}</span>
         <span class="badge-st ${st.cls}">${st.label}</span>
+        ${(r.venues&&r.venues.length)?r.venues.map(v=>`<span class="venue">${esc(v)}</span>`).join(""):""}
         <h3>${esc(r.title||"")}</h3>
       </div>
       ${r.description?`<div class="desc">${esc(r.description)}</div>`:""}
@@ -398,10 +421,13 @@ $("cancelBtn").addEventListener("click", closeModal);
 $("editOverlay").addEventListener("click", e=>{ if(e.target.id==="editOverlay") closeModal(); });
 
 function openEdit(id){
+  if(!IS_OWNER) return;   // 唯讀帳號不可編輯
   const r = id ? ALL.find(x=>x.id===id) : null;
   $("modalTitle").textContent = r ? "編輯優化紀錄" : "新增優化紀錄";
   $("fId").value       = r ? r.id : "";
   $("fCategory").value = r ? (r.category||"") : "";
+  const vs = (r && r.venues) || [];
+  document.querySelectorAll("#fVenues input").forEach(c=> c.checked = vs.includes(c.value));
   $("fTitle").value    = r ? (r.title||"") : "";
   $("fDesc").value     = r ? (r.description||"") : "";
   $("fUat").value      = r ? (r.uat_date||"") : "";
@@ -436,8 +462,10 @@ $("saveBtn").addEventListener("click", async ()=>{
     $("modalMsg").innerHTML = '<div class="msg err">系統分類與標題為必填</div>';
     return;
   }
+  const venues = [...document.querySelectorAll("#fVenues input:checked")].map(c=>c.value);
   const payload = {
     category: cat,
+    venues: venues.length ? venues : null,
     title,
     description: $("fDesc").value.trim() || null,
     uat_date: $("fUat").value || null,
@@ -462,6 +490,7 @@ $("saveBtn").addEventListener("click", async ()=>{
 });
 
 async function delRec(id){
+  if(!IS_OWNER) return;   // 唯讀帳號不可刪除
   const r = ALL.find(x=>x.id===id);
   if(!confirm(`確定刪除「${r?r.title:""}」這筆紀錄？`)) return;
   const {error} = await sb.from("optimizations").delete().eq("id", id);
@@ -498,7 +527,7 @@ function itemBlock(r){
     r.release_date?`更版 ${fmtDT(r.release_date)}`:""
   ].filter(Boolean).join("　｜　");
   return `<div class="item">
-    <div class="h"><span class="cat">${esc(r.category||"未分類")}【${st.label}】</span>
+    <div class="h"><span class="cat">${esc(r.category||"未分類")}${(r.venues&&r.venues.length)?" · "+esc(r.venues.join("/")):""}【${st.label}】</span>
       <span class="d">${esc(dates||"—")}</span></div>
     <h2>${esc(r.title||"")}</h2>
     ${r.description?`<div class="desc">${esc(r.description)}</div>`:""}
@@ -530,6 +559,7 @@ function exportOne(id){
     <div class="gen">產生時間：${new Date().toLocaleString("zh-TW")}</div>
     <table>
       <tr><td class="k">系統分類</td><td>${esc(r.category||"—")}</td></tr>
+      <tr><td class="k">場地</td><td>${(r.venues&&r.venues.length)?esc(r.venues.join("、")):"—"}</td></tr>
       <tr><td class="k">狀態</td><td>${st.label}</td></tr>
       <tr><td class="k">標題</td><td>${esc(r.title||"—")}</td></tr>
       <tr><td class="k">上 UAT 日期</td><td>${r.uat_date||"—"}</td></tr>

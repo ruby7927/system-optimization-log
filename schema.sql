@@ -8,6 +8,7 @@ create table if not exists public.optimizations (
   id              uuid primary key default gen_random_uuid(),
   user_id         uuid not null default auth.uid() references auth.users(id) on delete cascade,
   category        text not null,                 -- 系統分類（可自由新增）
+  venues          text[],                        -- 場地（可複選：CB / MX / siv）
   title           text not null,                 -- 標題
   description      text,                          -- 說明（做了什麼）
   uat_date         date,                          -- 上 UAT 日期
