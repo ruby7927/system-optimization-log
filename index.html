@@ -100,7 +100,7 @@
     <h1>🛠️ 系統優化紀錄</h1>
     <p class="sub" id="loginSub">請登入以繼續</p>
     <div class="field">
-      <label>Email</label>
+      <label>帳號（Email）</label>
       <input type="email" id="email" placeholder="you@example.com" autocomplete="username">
     </div>
     <div class="field">
@@ -108,9 +108,6 @@
       <input type="password" id="password" placeholder="••••••••" autocomplete="current-password">
     </div>
     <button class="btn-primary" id="authBtn">登入</button>
-    <div class="switch" id="switchWrap">
-      還沒有帳號？<a id="switchLink">註冊</a>
-    </div>
     <div id="loginMsg"></div>
   </div>
 </div>
@@ -223,7 +220,6 @@ try {
 const $ = id => document.getElementById(id);
 let ALL = [];          // 全部紀錄
 let CURRENT_USER = null;
-let signupMode = false;
 
 // ================= 登入邏輯 =================
 function setLoginMsg(txt, type){
@@ -233,35 +229,15 @@ function setLoginMsg(txt, type){
   if(!txt) el.className = "";
 }
 
-// 用事件委派處理「登入 / 註冊」切換（innerHTML 會換掉元素，故綁在 document 上）
-document.addEventListener("click", e=>{
-  if(e.target && e.target.id === "switchLink") {
-    signupMode = !signupMode;
-    $("loginSub").textContent = signupMode ? "建立你的帳號" : "請登入以繼續";
-    $("authBtn").textContent  = signupMode ? "註冊" : "登入";
-    $("switchWrap").innerHTML = signupMode
-      ? '已經有帳號了？<a id="switchLink">登入</a>'
-      : '還沒有帳號？<a id="switchLink">註冊</a>';
-    setLoginMsg("");
-  }
-});
-
 $("authBtn").addEventListener("click", async ()=>{
   const email = $("email").value.trim();
   const pw    = $("password").value;
-  if(!email || !pw){ setLoginMsg("請輸入 Email 與密碼","err"); return; }
+  if(!email || !pw){ setLoginMsg("請輸入帳號與密碼","err"); return; }
   if(!sb){ setLoginMsg("尚未設定 Supabase，請先編輯 config.js","err"); return; }
   $("authBtn").disabled = true;
   try{
-    if(signupMode){
-      const {error} = await sb.auth.signUp({email, password:pw});
-      if(error) throw error;
-      setLoginMsg("註冊成功！若有開啟信箱驗證請先收信驗證，然後登入。","ok");
-      signupMode = false; $("authBtn").textContent="登入"; $("loginSub").textContent="請登入以繼續";
-    } else {
-      const {error} = await sb.auth.signInWithPassword({email, password:pw});
-      if(error) throw error;
-    }
+    const {error} = await sb.auth.signInWithPassword({email, password:pw});
+    if(error) throw error;
   }catch(err){
     setLoginMsg(translateErr(err.message), "err");
   }finally{
