@@ -65,6 +65,11 @@
   .rec{background:var(--card);border-radius:12px;box-shadow:var(--shadow);padding:16px 18px;border-left:4px solid var(--brand)}
   .rec .top{display:flex;align-items:flex-start;gap:10px}
   .rec .cat{background:var(--brand-l);color:var(--brand-d);font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px;white-space:nowrap}
+  .badge-st{font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px;white-space:nowrap}
+  .st-uat {background:#fff4e6;color:#d9480f}   /* 測試中 */
+  .st-done{background:#e7f5ff;color:#1971c2}   /* 測試完成 */
+  .st-prod{background:#ebfbee;color:#2f9e44}   /* 上正式 */
+  .st-todo{background:#f1f3f5;color:#868e96}   /* 待處理 */
   .rec h3{margin:0;font-size:16px;flex:1}
   .rec .date{font-size:12px;color:var(--muted);white-space:nowrap}
   .rec .desc{margin:10px 0 0;color:#3c4356;font-size:14px;line-height:1.6;white-space:pre-wrap}
@@ -135,11 +140,11 @@
         <select id="qCategory"><option value="">全部</option></select>
       </div>
       <div class="f">
-        <label>起始日期</label>
+        <label>上UAT起日</label>
         <input type="date" id="qFrom">
       </div>
       <div class="f">
-        <label>結束日期</label>
+        <label>上UAT迄日</label>
         <input type="date" id="qTo">
       </div>
       <div class="f">
@@ -176,8 +181,8 @@
         <datalist id="catList"></datalist>
       </div>
       <div class="field">
-        <label>更版日期</label>
-        <input type="date" id="fDate">
+        <label>執行人</label>
+        <input type="text" id="fExec" placeholder="姓名">
       </div>
     </div>
     <div class="field">
@@ -190,13 +195,27 @@
     </div>
     <div class="row">
       <div class="field">
+        <label>上 UAT 日期</label>
+        <input type="date" id="fUat">
+      </div>
+      <div class="field">
+        <label>測試完成日期</label>
+        <input type="date" id="fTestDone">
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>更版日期時間（含時分秒）</label>
+        <input type="datetime-local" id="fRelease" step="1">
+      </div>
+      <div class="field">
         <label>需求書連結（網址）</label>
         <input type="url" id="fUrl" placeholder="https://…">
       </div>
-      <div class="field">
-        <label>執行人</label>
-        <input type="text" id="fExec" placeholder="姓名">
-      </div>
+    </div>
+    <div class="field">
+      <label>目前狀態（依上方日期自動判斷）</label>
+      <div id="fStatusPreview" style="padding:4px 0"></div>
     </div>
     <div id="modalMsg"></div>
     <div class="modal-acts">
@@ -287,7 +306,7 @@ function leaveApp(){
 // ================= 資料讀取 =================
 async function loadData(){
   const {data, error} = await sb.from("optimizations")
-    .select("*").order("release_date",{ascending:false, nullsFirst:false})
+    .select("*").order("uat_date",{ascending:false, nullsFirst:false})
     .order("created_at",{ascending:false});
   if(error){ alert("讀取失敗："+error.message); return; }
   ALL = data || [];
@@ -304,16 +323,26 @@ function refreshCategoryOptions(){
   $("catList").innerHTML = cats.map(c=>`<option value="${esc(c)}">`).join("");
 }
 
+// 狀態：依已填日期自動判斷（上正式 > 測試完成 > 測試中 > 待處理）
+function calcStatus(r){
+  if(r.release_date)   return {label:"上正式",   cls:"st-prod"};
+  if(r.test_done_date) return {label:"測試完成", cls:"st-done"};
+  if(r.uat_date)       return {label:"測試中",   cls:"st-uat"};
+  return {label:"待處理", cls:"st-todo"};
+}
+// 把 timestamp 字串（2026-07-27T14:30:00）顯示成 2026-07-27 14:30:00
+function fmtDT(s){ return s ? String(s).replace("T"," ").slice(0,19) : ""; }
+
 // ================= 篩選 + 渲染 =================
 function getFiltered(){
   const kw = $("qKeyword").value.trim().toLowerCase();
   const cat = $("qCategory").value;
-  const from = $("qFrom").value;
+  const from = $("qFrom").value;   // 篩選以「上 UAT 日期」為主
   const to   = $("qTo").value;
   return ALL.filter(r=>{
     if(cat && r.category !== cat) return false;
-    if(from && (!r.release_date || r.release_date < from)) return false;
-    if(to   && (!r.release_date || r.release_date > to)) return false;
+    if(from && (!r.uat_date || r.uat_date < from)) return false;
+    if(to   && (!r.uat_date || r.uat_date > to)) return false;
     if(kw){
       const hay = ((r.title||"")+" "+(r.description||"")).toLowerCase();
       if(!hay.includes(kw)) return false;
@@ -331,15 +360,20 @@ function render(){
     list.innerHTML = '<div class="empty">目前沒有符合條件的紀錄。<br>點右上「＋ 新增紀錄」開始建立。</div>';
     return;
   }
-  list.innerHTML = rows.map(r=>`
+  list.innerHTML = rows.map(r=>{
+    const st = calcStatus(r);
+    return `
     <div class="rec">
       <div class="top">
         <span class="cat">${esc(r.category||"未分類")}</span>
+        <span class="badge-st ${st.cls}">${st.label}</span>
         <h3>${esc(r.title||"")}</h3>
-        <span class="date">${r.release_date||"—"}</span>
       </div>
       ${r.description?`<div class="desc">${esc(r.description)}</div>`:""}
       <div class="meta">
+        ${r.uat_date?`<span>🧪 上UAT ${r.uat_date}</span>`:""}
+        ${r.test_done_date?`<span>✅ 測完 ${r.test_done_date}</span>`:""}
+        ${r.release_date?`<span>🚀 更版 ${fmtDT(r.release_date)}</span>`:""}
         ${r.executor?`<span>👤 ${esc(r.executor)}</span>`:""}
         ${r.requirement_url?`<span>🔗 <a href="${esc(r.requirement_url)}" target="_blank" rel="noopener">需求書</a></span>`:""}
       </div>
@@ -348,7 +382,8 @@ function render(){
         <button class="btn-ghost" onclick="exportOne('${r.id}')">📄 匯出 PDF</button>
         <button class="btn-danger" onclick="delRec('${r.id}')">刪除</button>
       </div>
-    </div>`).join("");
+    </div>`;
+  }).join("");
 }
 
 ["qKeyword","qCategory","qFrom","qTo"].forEach(id=> $(id).addEventListener("input", render));
@@ -367,17 +402,32 @@ function openEdit(id){
   $("modalTitle").textContent = r ? "編輯優化紀錄" : "新增優化紀錄";
   $("fId").value       = r ? r.id : "";
   $("fCategory").value = r ? (r.category||"") : "";
-  $("fDate").value     = r ? (r.release_date||"") : "";
   $("fTitle").value    = r ? (r.title||"") : "";
   $("fDesc").value     = r ? (r.description||"") : "";
+  $("fUat").value      = r ? (r.uat_date||"") : "";
+  $("fTestDone").value = r ? (r.test_done_date||"") : "";
+  // datetime-local 需要 YYYY-MM-DDTHH:MM(:SS) 格式
+  $("fRelease").value  = r && r.release_date ? String(r.release_date).replace(" ","T").slice(0,19) : "";
   $("fUrl").value      = r ? (r.requirement_url||"") : "";
   $("fExec").value     = r ? (r.executor||"") : "";
   $("modalMsg").innerHTML = "";
   refreshCategoryOptions();
+  updateStatusPreview();
   $("editOverlay").classList.remove("hidden");
   $("fTitle").focus();
 }
 function closeModal(){ $("editOverlay").classList.add("hidden"); }
+
+// 表單內即時預覽狀態
+function updateStatusPreview(){
+  const st = calcStatus({
+    uat_date: $("fUat").value || null,
+    test_done_date: $("fTestDone").value || null,
+    release_date: $("fRelease").value || null
+  });
+  $("fStatusPreview").innerHTML = `<span class="badge-st ${st.cls}">${st.label}</span>`;
+}
+["fUat","fTestDone","fRelease"].forEach(id=> $(id).addEventListener("input", updateStatusPreview));
 
 $("saveBtn").addEventListener("click", async ()=>{
   const cat = $("fCategory").value.trim();
@@ -390,7 +440,9 @@ $("saveBtn").addEventListener("click", async ()=>{
     category: cat,
     title,
     description: $("fDesc").value.trim() || null,
-    release_date: $("fDate").value || null,
+    uat_date: $("fUat").value || null,
+    test_done_date: $("fTestDone").value || null,
+    release_date: $("fRelease").value || null,   // datetime-local 字串，含時分秒
     requirement_url: $("fUrl").value.trim() || null,
     executor: $("fExec").value.trim() || null,
     user_id: CURRENT_USER.id
@@ -439,9 +491,15 @@ function pdfStyle(){
   </style>`;
 }
 function itemBlock(r){
+  const st = calcStatus(r);
+  const dates = [
+    r.uat_date?`上UAT ${r.uat_date}`:"",
+    r.test_done_date?`測完 ${r.test_done_date}`:"",
+    r.release_date?`更版 ${fmtDT(r.release_date)}`:""
+  ].filter(Boolean).join("　｜　");
   return `<div class="item">
-    <div class="h"><span class="cat">${esc(r.category||"未分類")}</span>
-      <span class="d">更版：${r.release_date||"—"}</span></div>
+    <div class="h"><span class="cat">${esc(r.category||"未分類")}【${st.label}】</span>
+      <span class="d">${esc(dates||"—")}</span></div>
     <h2>${esc(r.title||"")}</h2>
     ${r.description?`<div class="desc">${esc(r.description)}</div>`:""}
     <div class="meta">
@@ -467,12 +525,16 @@ function runPdf(html, filename){
 function exportOne(id){
   const r = ALL.find(x=>x.id===id);
   if(!r) return;
+  const st = calcStatus(r);
   const body = `<h1>系統優化紀錄</h1>
     <div class="gen">產生時間：${new Date().toLocaleString("zh-TW")}</div>
     <table>
       <tr><td class="k">系統分類</td><td>${esc(r.category||"—")}</td></tr>
+      <tr><td class="k">狀態</td><td>${st.label}</td></tr>
       <tr><td class="k">標題</td><td>${esc(r.title||"—")}</td></tr>
-      <tr><td class="k">更版日期</td><td>${r.release_date||"—"}</td></tr>
+      <tr><td class="k">上 UAT 日期</td><td>${r.uat_date||"—"}</td></tr>
+      <tr><td class="k">測試完成</td><td>${r.test_done_date||"—"}</td></tr>
+      <tr><td class="k">更版日期時間</td><td>${fmtDT(r.release_date)||"—"}</td></tr>
       <tr><td class="k">執行人</td><td>${esc(r.executor||"—")}</td></tr>
       <tr><td class="k">需求書</td><td>${r.requirement_url?`<a href="${esc(r.requirement_url)}">${esc(r.requirement_url)}</a>`:"—"}</td></tr>
       <tr><td class="k">說明</td><td style="white-space:pre-wrap">${esc(r.description||"—")}</td></tr>
@@ -486,7 +548,7 @@ $("pdfListBtn").addEventListener("click", ()=>{
   const cat = $("qCategory").value;
   const sub = [
     cat?`分類：${cat}`:"全部分類",
-    ($("qFrom").value||$("qTo").value)?`期間：${$("qFrom").value||"…"} ~ ${$("qTo").value||"…"}`:"",
+    ($("qFrom").value||$("qTo").value)?`上UAT期間：${$("qFrom").value||"…"} ~ ${$("qTo").value||"…"}`:"",
     $("qKeyword").value?`關鍵字：${$("qKeyword").value}`:""
   ].filter(Boolean).join("　｜　");
   const body = `<h1>系統優化紀錄 — 清單報告</h1>

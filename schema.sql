@@ -10,17 +10,20 @@ create table if not exists public.optimizations (
   category        text not null,                 -- 系統分類（可自由新增）
   title           text not null,                 -- 標題
   description      text,                          -- 說明（做了什麼）
-  release_date     date,                          -- 更版日期
+  uat_date         date,                          -- 上 UAT 日期
+  test_done_date   date,                          -- 測試完成日期
+  release_date     timestamp,                     -- 更版日期時間（含時分秒）
   requirement_url  text,                          -- 需求書連結（網址）
   executor         text,                          -- 執行人
   created_at       timestamptz not null default now(),
   updated_at       timestamptz not null default now()
 );
+-- 狀態（測試中/測試完成/上正式）由三個日期於前端自動判斷，不另存欄位
 
--- 常用查詢索引
+-- 常用查詢索引（篩選以上 UAT 日期為主）
 create index if not exists idx_opt_user        on public.optimizations (user_id);
 create index if not exists idx_opt_category    on public.optimizations (user_id, category);
-create index if not exists idx_opt_release     on public.optimizations (user_id, release_date desc);
+create index if not exists idx_opt_uat         on public.optimizations (user_id, uat_date desc);
 
 -- updated_at 自動更新
 create or replace function public.set_updated_at()
