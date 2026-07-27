@@ -308,9 +308,9 @@ if(sb){
 
 function enterApp(user){
   CURRENT_USER = user;
-  // 判斷是否為擁有者（可編輯）。ownerEmails 留空 = 所有人可編輯
-  const owners = ((window.APP_CONFIG && window.APP_CONFIG.ownerEmails) || []).map(e=>String(e).toLowerCase());
-  IS_OWNER = owners.length === 0 || owners.includes(String(user.email).toLowerCase());
+  // 唯讀（公用）帳號清單內 → 唯讀；其餘（含擁有者）可編輯
+  const ro = ((window.APP_CONFIG && window.APP_CONFIG.readonlyEmails) || []).map(e=>String(e).toLowerCase());
+  IS_OWNER = !ro.includes(String(user.email).toLowerCase());
   document.body.classList.toggle("readonly", !IS_OWNER);
   $("roBadge").classList.toggle("hidden", IS_OWNER);
   $("loginView").classList.add("hidden");

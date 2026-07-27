@@ -7,8 +7,8 @@ window.SUPABASE_CONFIG = {
   anonKey: "sb_publishable_zsUAVbdBpO4HBN3AtlgSUg_FzYjChQP"   // publishable (anon) key
 };
 
-// 擁有者（可編輯）帳號 email，可多個。工程師帳號不在此清單 → 唯讀。
-// 留空陣列 = 所有登入者皆可編輯（目前狀態）。
+// 唯讀（公用）帳號清單：清單內的帳號登入後只能讀，看不到新增/編輯/刪除。
+// 其餘帳號（含你自己）皆可編輯。留空 = 所有人可編輯。
 window.APP_CONFIG = {
-  ownerEmails: []
+  readonlyEmails: ["engineer@optlog.tw"]   // 工程師共用的唯讀帳號
 };

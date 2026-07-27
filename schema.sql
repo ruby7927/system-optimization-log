@@ -40,22 +40,28 @@ create trigger trg_opt_updated_at
   for each row execute function public.set_updated_at();
 
 -- ============================================================
--- Row Level Security：每個人只能看到/操作自己的資料
+-- Row Level Security
+-- 讀：所有登入者可讀全部；寫：除公用唯讀帳號外皆可
+-- 公用唯讀帳號 email = engineer@optlog.tw
 -- ============================================================
 alter table public.optimizations enable row level security;
 
-drop policy if exists "own rows - select" on public.optimizations;
-create policy "own rows - select" on public.optimizations
-  for select using (auth.uid() = user_id);
+drop policy if exists "read all authenticated" on public.optimizations;
+create policy "read all authenticated" on public.optimizations
+  for select to authenticated using (true);
 
-drop policy if exists "own rows - insert" on public.optimizations;
-create policy "own rows - insert" on public.optimizations
-  for insert with check (auth.uid() = user_id);
+drop policy if exists "write except viewer - insert" on public.optimizations;
+create policy "write except viewer - insert" on public.optimizations
+  for insert to authenticated
+  with check ( (auth.jwt() ->> 'email') <> 'engineer@optlog.tw' );
 
-drop policy if exists "own rows - update" on public.optimizations;
-create policy "own rows - update" on public.optimizations
-  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+drop policy if exists "write except viewer - update" on public.optimizations;
+create policy "write except viewer - update" on public.optimizations
+  for update to authenticated
+  using      ( (auth.jwt() ->> 'email') <> 'engineer@optlog.tw' )
+  with check ( (auth.jwt() ->> 'email') <> 'engineer@optlog.tw' );
 
-drop policy if exists "own rows - delete" on public.optimizations;
-create policy "own rows - delete" on public.optimizations
-  for delete using (auth.uid() = user_id);
+drop policy if exists "write except viewer - delete" on public.optimizations;
+create policy "write except viewer - delete" on public.optimizations
+  for delete to authenticated
+  using ( (auth.jwt() ->> 'email') <> 'engineer@optlog.tw' );
