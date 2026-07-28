@@ -171,12 +171,8 @@
         <label>&nbsp;</label>
         <button class="btn-primary" id="newBtn">＋ 新增紀錄</button>
       </div>
-    </div>
-
-    <div class="stats">
-      <div class="stat"><div class="n" id="stTotal">0</div><div class="l">符合筆數</div></div>
-      <div class="stat"><div class="n" id="stCats">0</div><div class="l">系統分類數</div></div>
-      <div class="stat" style="flex:2;display:flex;align-items:center;justify-content:flex-end;gap:10px">
+      <div class="f">
+        <label>&nbsp;</label>
         <button class="btn-ghost" id="pdfListBtn">📄 匯出清單 PDF</button>
       </div>
     </div>
@@ -382,8 +378,6 @@ function getFiltered(){
 
 function render(){
   const rows = getFiltered();
-  $("stTotal").textContent = rows.length;
-  $("stCats").textContent = new Set(ALL.map(r=>r.category)).size;
   const list = $("list");
   if(rows.length === 0){
     list.innerHTML = '<div class="empty">目前沒有符合條件的紀錄。<br>點右上「＋ 新增紀錄」開始建立。</div>';
