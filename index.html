@@ -6,7 +6,6 @@
 <title>系統優化紀錄</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛠️</text></svg>">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
 <script src="config.js"></script>
 <style>
   :root{
@@ -240,9 +239,6 @@
     </div>
   </div>
 </div>
-
-<!-- PDF 匯出用隱藏容器 -->
-<div id="pdfArea" style="position:fixed;left:-9999px;top:0"></div>
 
 <script>
 // ================= Supabase 初始化 =================
@@ -498,26 +494,28 @@ async function delRec(id){
   await loadData();
 }
 
-// ================= PDF 匯出 =================
-function pdfStyle(){
+// ================= PDF 匯出（瀏覽器原生列印 → 另存為 PDF） =================
+function printStyle(){
   return `
   <style>
-    *{font-family:"Microsoft JhengHei","PMingLiU",sans-serif;color:#1e2433}
-    .doc{padding:8px 4px}
-    .doc h1{font-size:20px;margin:0 0 4px;border-bottom:3px solid #3b5bdb;padding-bottom:8px}
-    .doc .gen{font-size:11px;color:#888;margin:4px 0 18px}
-    .item{border:1px solid #e0e4ee;border-radius:8px;padding:12px 14px;margin-bottom:12px;page-break-inside:avoid;break-inside:avoid}
-    .item .h{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
-    .item .cat{background:#edf0fd;color:#2f49b0;font-size:11px;font-weight:bold;padding:2px 8px;border-radius:10px}
-    .item h2{font-size:15px;margin:6px 0 0}
-    .item .d{font-size:12px;color:#666}
-    .item .desc{font-size:12.5px;line-height:1.6;margin:8px 0 0;white-space:pre-wrap;color:#33384a}
-    .item .meta{font-size:11.5px;color:#666;margin-top:8px}
-    .item .meta a{color:#3b5bdb;text-decoration:none}
-    table{width:100%;border-collapse:collapse;font-size:12.5px}
-    tr{page-break-inside:avoid;break-inside:avoid}
-    td{padding:6px 8px;border:1px solid #e0e4ee;vertical-align:top}
-    td.k{background:#f6f8fd;color:#666;width:96px;font-weight:bold}
+    @page { size: A4; margin: 14mm; }
+    *{ box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact;
+       font-family:"Microsoft JhengHei","PMingLiU",sans-serif; }
+    html,body{ margin:0; padding:0; color:#1e2433; }
+    .doc h1{ font-size:20px; margin:0 0 6px; border-bottom:3px solid #3b5bdb; padding-bottom:8px; }
+    .doc .gen{ font-size:11px; color:#888; margin:4px 0 18px; line-height:1.5; }
+    .item{ border:1px solid #e0e4ee; border-radius:8px; padding:12px 14px; margin-bottom:12px; page-break-inside:avoid; }
+    .item .h{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; }
+    .item .cat{ background:#edf0fd; color:#2f49b0; font-size:11px; font-weight:bold; padding:3px 9px; border-radius:10px; }
+    .item h2{ font-size:15px; margin:8px 0 0; line-height:1.4; }
+    .item .d{ font-size:12px; color:#666; white-space:nowrap; }
+    .item .desc{ font-size:12.5px; line-height:1.6; margin:8px 0 0; white-space:pre-wrap; color:#33384a; }
+    .item .meta{ font-size:11.5px; color:#666; margin-top:8px; }
+    .item .meta a{ color:#3b5bdb; text-decoration:none; }
+    table{ width:100%; border-collapse:collapse; font-size:12.5px; }
+    tr{ page-break-inside:avoid; }
+    td{ padding:6px 8px; border:1px solid #e0e4ee; vertical-align:top; line-height:1.5; }
+    td.k{ background:#f6f8fd; color:#666; width:96px; font-weight:bold; }
   </style>`;
 }
 function itemBlock(r){
@@ -540,22 +538,23 @@ function itemBlock(r){
 }
 
 function runPdf(html, filename){
-  if(typeof html2pdf === "undefined"){ alert("PDF 元件尚未載入，請重新整理頁面再試"); return; }
-  const area = $("pdfArea");
-  // 來源需為有寬度的區塊（不能用 fixed/無寬度，否則分頁量到空白）
-  area.style.cssText = "position:absolute;left:-9999px;top:0;width:780px;background:#ffffff";
-  area.innerHTML = pdfStyle() + `<div class="doc">${html}</div>`;
-  const reset = ()=>{ area.innerHTML=""; area.style.cssText="position:absolute;left:-9999px;top:0"; };
-  html2pdf().set({
-    margin:[12,12,14,12],
-    filename,
-    image:{type:"jpeg",quality:0.98},
-    html2canvas:{scale:2, useCORS:true, backgroundColor:"#ffffff", windowWidth:780},
-    jsPDF:{unit:"mm",format:"a4",orientation:"portrait"},
-    pagebreak:{mode:["css","legacy"], avoid:["tr",".item"]}
-  }).from(area.querySelector(".doc")).save()
-    .then(reset)
-    .catch(err=>{ console.error("PDF 產生失敗:", err); reset(); alert("PDF 產生失敗："+(err&&err.message||err)); });
+  // 用隱藏 iframe 載入排版好的內容，呼叫瀏覽器列印 → 使用者選「另存為 PDF」
+  // 中文完美、不漏字、分頁乾淨、文字可選取
+  const prev = document.getElementById("printFrame");
+  if(prev) prev.remove();
+  const iframe = document.createElement("iframe");
+  iframe.id = "printFrame";
+  iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden";
+  document.body.appendChild(iframe);
+  const title = String(filename).replace(/\.pdf$/i, "");   // 存檔預設檔名 = 文件標題
+  const doc = iframe.contentWindow.document;
+  doc.open();
+  doc.write(`<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><title>${esc(title)}</title>${printStyle()}</head><body><div class="doc">${html}</div></body></html>`);
+  doc.close();
+  let done = false;
+  const go = ()=>{ if(done) return; done = true; try{ iframe.contentWindow.focus(); iframe.contentWindow.print(); }catch(e){ console.error(e); alert("列印失敗："+(e&&e.message||e)); } };
+  iframe.onload = go;
+  setTimeout(go, 500);   // onload 有時不觸發，保險再叫一次
 }
 
 function exportOne(id){
