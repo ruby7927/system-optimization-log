@@ -152,7 +152,7 @@
           <option value="">全部</option>
           <option value="CB">CB</option>
           <option value="MX">MX</option>
-          <option value="siv">siv</option>
+          <option value="SIV">SIV</option>
         </select>
       </div>
       <div class="f">
@@ -206,7 +206,7 @@
       <div class="chips" id="fVenues">
         <label class="chip"><input type="checkbox" value="CB"> CB</label>
         <label class="chip"><input type="checkbox" value="MX"> MX</label>
-        <label class="chip"><input type="checkbox" value="siv"> siv</label>
+        <label class="chip"><input type="checkbox" value="SIV"> SIV</label>
       </div>
     </div>
     <div class="field">
@@ -369,7 +369,7 @@ function getFiltered(){
   const to   = $("qTo").value;
   return ALL.filter(r=>{
     if(cat && r.category !== cat) return false;
-    if(venue && !(r.venues && r.venues.includes(venue))) return false;
+    if(venue && !(r.venues && r.venues.some(v=>String(v).toUpperCase()===venue.toUpperCase()))) return false;
     if(from && (!r.uat_date || r.uat_date < from)) return false;
     if(to   && (!r.uat_date || r.uat_date > to)) return false;
     if(kw){
@@ -396,7 +396,7 @@ function render(){
       <div class="top">
         <span class="cat">${esc(r.category||"未分類")}</span>
         <span class="badge-st ${st.cls}">${st.label}</span>
-        ${(r.venues&&r.venues.length)?r.venues.map(v=>`<span class="venue">${esc(v)}</span>`).join(""):""}
+        ${(r.venues&&r.venues.length)?r.venues.map(v=>`<span class="venue">${esc(String(v).toUpperCase())}</span>`).join(""):""}
         <h3>${esc(r.title||"")}</h3>
       </div>
       ${r.description?`<div class="desc">${esc(r.description)}</div>`:""}
@@ -433,8 +433,8 @@ function openEdit(id){
   $("modalTitle").textContent = r ? "編輯優化紀錄" : "新增優化紀錄";
   $("fId").value       = r ? r.id : "";
   $("fCategory").value = r ? (r.category||"") : "";
-  const vs = (r && r.venues) || [];
-  document.querySelectorAll("#fVenues input").forEach(c=> c.checked = vs.includes(c.value));
+  const vs = ((r && r.venues) || []).map(v=>String(v).toUpperCase());
+  document.querySelectorAll("#fVenues input").forEach(c=> c.checked = vs.includes(c.value.toUpperCase()));
   $("fTitle").value    = r ? (r.title||"") : "";
   $("fDesc").value     = r ? (r.description||"") : "";
   $("fUat").value      = r ? (r.uat_date||"") : "";
@@ -537,7 +537,7 @@ function itemBlock(r){
     r.release_date?`更版 ${fmtDT(r.release_date)}`:""
   ].filter(Boolean).join("　｜　");
   return `<div class="item">
-    <div class="h"><span class="cat">${esc(r.category||"未分類")}${(r.venues&&r.venues.length)?" · "+esc(r.venues.join("/")):""}【${st.label}】</span>
+    <div class="h"><span class="cat">${esc(r.category||"未分類")}${(r.venues&&r.venues.length)?" · "+esc(r.venues.map(v=>String(v).toUpperCase()).join("/")):""}【${st.label}】</span>
       <span class="d">${esc(dates||"—")}</span></div>
     <h2>${esc(r.title||"")}</h2>
     ${r.description?`<div class="desc">${esc(r.description)}</div>`:""}
@@ -576,7 +576,7 @@ function exportOne(id){
     <div class="gen">產生時間：${new Date().toLocaleString("zh-TW")}</div>
     <table>
       <tr><td class="k">系統分類</td><td>${esc(r.category||"—")}</td></tr>
-      <tr><td class="k">場地</td><td>${(r.venues&&r.venues.length)?esc(r.venues.join("、")):"—"}</td></tr>
+      <tr><td class="k">場地</td><td>${(r.venues&&r.venues.length)?esc(r.venues.map(v=>String(v).toUpperCase()).join("、")):"—"}</td></tr>
       <tr><td class="k">狀態</td><td>${st.label}</td></tr>
       <tr><td class="k">標題</td><td>${esc(r.title||"—")}</td></tr>
       <tr><td class="k">上 UAT 日期</td><td>${r.uat_date||"—"}</td></tr>
