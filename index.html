@@ -147,6 +147,15 @@
         <select id="qCategory"><option value="">全部</option></select>
       </div>
       <div class="f">
+        <label>場地</label>
+        <select id="qVenue">
+          <option value="">全部</option>
+          <option value="CB">CB</option>
+          <option value="MX">MX</option>
+          <option value="siv">siv</option>
+        </select>
+      </div>
+      <div class="f">
         <label>上UAT起日</label>
         <input type="date" id="qFrom">
       </div>
@@ -355,10 +364,12 @@ function fmtDT(s){ return s ? String(s).replace("T"," ").slice(0,19) : ""; }
 function getFiltered(){
   const kw = $("qKeyword").value.trim().toLowerCase();
   const cat = $("qCategory").value;
+  const venue = $("qVenue").value;
   const from = $("qFrom").value;   // 篩選以「上 UAT 日期」為主
   const to   = $("qTo").value;
   return ALL.filter(r=>{
     if(cat && r.category !== cat) return false;
+    if(venue && !(r.venues && r.venues.includes(venue))) return false;
     if(from && (!r.uat_date || r.uat_date < from)) return false;
     if(to   && (!r.uat_date || r.uat_date > to)) return false;
     if(kw){
@@ -405,9 +416,9 @@ function render(){
   }).join("");
 }
 
-["qKeyword","qCategory","qFrom","qTo"].forEach(id=> $(id).addEventListener("input", render));
+["qKeyword","qCategory","qVenue","qFrom","qTo"].forEach(id=> $(id).addEventListener("input", render));
 $("clearBtn").addEventListener("click", ()=>{
-  $("qKeyword").value=""; $("qCategory").value=""; $("qFrom").value=""; $("qTo").value="";
+  $("qKeyword").value=""; $("qCategory").value=""; $("qVenue").value=""; $("qFrom").value=""; $("qTo").value="";
   render();
 });
 
@@ -584,6 +595,7 @@ $("pdfListBtn").addEventListener("click", ()=>{
   const cat = $("qCategory").value;
   const sub = [
     cat?`分類：${cat}`:"全部分類",
+    $("qVenue").value?`場地：${$("qVenue").value}`:"",
     ($("qFrom").value||$("qTo").value)?`上UAT期間：${$("qFrom").value||"…"} ~ ${$("qTo").value||"…"}`:"",
     $("qKeyword").value?`關鍵字：${$("qKeyword").value}`:""
   ].filter(Boolean).join("　｜　");
