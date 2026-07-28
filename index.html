@@ -539,16 +539,22 @@ function itemBlock(r){
 }
 
 function runPdf(html, filename){
+  if(typeof html2pdf === "undefined"){ alert("PDF 元件尚未載入，請重新整理頁面再試"); return; }
   const area = $("pdfArea");
+  // 來源需為有寬度的區塊（不能用 fixed/無寬度，否則分頁量到空白）
+  area.style.cssText = "position:absolute;left:-9999px;top:0;width:780px;background:#ffffff";
   area.innerHTML = pdfStyle() + `<div class="doc">${html}</div>`;
+  const reset = ()=>{ area.innerHTML=""; area.style.cssText="position:absolute;left:-9999px;top:0"; };
   html2pdf().set({
     margin:[12,12,14,12],
     filename,
     image:{type:"jpeg",quality:0.98},
-    html2canvas:{scale:2,useCORS:true},
+    html2canvas:{scale:2, useCORS:true, backgroundColor:"#ffffff", windowWidth:780},
     jsPDF:{unit:"mm",format:"a4",orientation:"portrait"},
     pagebreak:{mode:["css","legacy"]}
-  }).from(area).save().then(()=>{ area.innerHTML=""; });
+  }).from(area.querySelector(".doc")).save()
+    .then(reset)
+    .catch(err=>{ console.error("PDF 產生失敗:", err); reset(); alert("PDF 產生失敗："+(err&&err.message||err)); });
 }
 
 function exportOne(id){
