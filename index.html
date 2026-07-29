@@ -365,6 +365,14 @@ function calcStatus(r){
 }
 // 把 timestamp 字串（2026-07-27T14:30:00）顯示成 2026-07-27 14:30:00
 function fmtDT(s){ return s ? String(s).replace("T"," ").slice(0,19) : ""; }
+// 建立時間（帶時區的 ISO）顯示成本地日期 2026-07-29
+function fmtDate(s){
+  if(!s) return "";
+  const d = new Date(s);
+  if(isNaN(d)) return String(s).slice(0,10);
+  const p = n => String(n).padStart(2,"0");
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
+}
 
 // ================= 篩選 + 渲染 =================
 function getFiltered(){
@@ -407,6 +415,7 @@ function render(){
       </div>
       ${r.description?`<div class="desc">${esc(r.description)}</div>`:""}
       <div class="meta">
+        ${r.created_at?`<span>🗓️ 建立 ${fmtDate(r.created_at)}</span>`:""}
         ${r.uat_date?`<span>🧪 上UAT ${r.uat_date}</span>`:""}
         ${r.test_done_date?`<span>✅ 測完 ${r.test_done_date}</span>`:""}
         ${r.release_date?`<span>🚀 更版 ${fmtDT(r.release_date)}</span>`:""}
@@ -538,6 +547,7 @@ function printStyle(){
 function itemBlock(r){
   const st = calcStatus(r);
   const dates = [
+    r.created_at?`建立 ${fmtDate(r.created_at)}`:"",
     r.uat_date?`上UAT ${r.uat_date}`:"",
     r.test_done_date?`測完 ${r.test_done_date}`:"",
     r.release_date?`更版 ${fmtDT(r.release_date)}`:""
@@ -581,6 +591,7 @@ function exportOne(id){
   const body = `<h1>系統優化紀錄</h1>
     <div class="gen">產生時間：${new Date().toLocaleString("zh-TW")}</div>
     <table>
+      <tr><td class="k">建立日期</td><td>${fmtDate(r.created_at)||"—"}</td></tr>
       <tr><td class="k">系統分類</td><td>${esc(r.category||"—")}</td></tr>
       <tr><td class="k">場地</td><td>${(r.venues&&r.venues.length)?esc(r.venues.map(v=>String(v).toUpperCase()).join("、")):"—"}</td></tr>
       <tr><td class="k">狀態</td><td>${st.label}</td></tr>
