@@ -41,27 +41,49 @@ create trigger trg_opt_updated_at
 
 -- ============================================================
 -- Row Level Security
--- 讀：所有登入者可讀全部；寫：除公用唯讀帳號外皆可
--- 公用唯讀帳號 email = engineer@optlog.tw
+-- 讀：擁有者(不在 viewer_categories)看全部；工程師只看被指派分類
+-- 寫：只有擁有者
+-- 帳號↔分類對應與函式見 migration_per_engineer_categories.sql
 -- ============================================================
+
+-- 帳號 ↔ 可見分類 對應表
+create table if not exists public.viewer_categories (
+  user_email text not null,
+  category   text not null,
+  primary key (user_email, category)
+);
+alter table public.viewer_categories enable row level security;  -- 不建 policy = 前端不可直接存取
+
+-- 判斷函式（SECURITY DEFINER 繞過對應表 RLS）
+create or replace function public.is_owner()
+returns boolean language sql security definer stable set search_path = public as $$
+  select not exists (select 1 from public.viewer_categories vc
+                     where vc.user_email = (auth.jwt() ->> 'email'));
+$$;
+create or replace function public.can_view_category(cat text)
+returns boolean language sql security definer stable set search_path = public as $$
+  select not exists (select 1 from public.viewer_categories vc
+                     where vc.user_email = (auth.jwt() ->> 'email'))
+      or exists (select 1 from public.viewer_categories vc
+                 where vc.user_email = (auth.jwt() ->> 'email') and vc.category = cat);
+$$;
+grant execute on function public.is_owner() to authenticated;
+grant execute on function public.can_view_category(text) to authenticated;
+
 alter table public.optimizations enable row level security;
 
-drop policy if exists "read all authenticated" on public.optimizations;
-create policy "read all authenticated" on public.optimizations
-  for select to authenticated using (true);
+drop policy if exists "select by category" on public.optimizations;
+create policy "select by category" on public.optimizations
+  for select to authenticated using ( public.can_view_category(category) );
 
-drop policy if exists "write except viewer - insert" on public.optimizations;
-create policy "write except viewer - insert" on public.optimizations
-  for insert to authenticated
-  with check ( (auth.jwt() ->> 'email') <> 'engineer@optlog.tw' );
+drop policy if exists "owner write - insert" on public.optimizations;
+create policy "owner write - insert" on public.optimizations
+  for insert to authenticated with check ( public.is_owner() );
 
-drop policy if exists "write except viewer - update" on public.optimizations;
-create policy "write except viewer - update" on public.optimizations
-  for update to authenticated
-  using      ( (auth.jwt() ->> 'email') <> 'engineer@optlog.tw' )
-  with check ( (auth.jwt() ->> 'email') <> 'engineer@optlog.tw' );
+drop policy if exists "owner write - update" on public.optimizations;
+create policy "owner write - update" on public.optimizations
+  for update to authenticated using ( public.is_owner() ) with check ( public.is_owner() );
 
-drop policy if exists "write except viewer - delete" on public.optimizations;
-create policy "write except viewer - delete" on public.optimizations
-  for delete to authenticated
-  using ( (auth.jwt() ->> 'email') <> 'engineer@optlog.tw' );
+drop policy if exists "owner write - delete" on public.optimizations;
+create policy "owner write - delete" on public.optimizations
+  for delete to authenticated using ( public.is_owner() );
