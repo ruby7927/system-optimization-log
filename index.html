@@ -89,6 +89,16 @@
   .modal-acts{display:flex;justify-content:flex-end;gap:10px;margin-top:22px}
   textarea{resize:vertical;min-height:90px}
   .req{color:var(--danger)}
+  /* 富文字編輯器 */
+  .rte-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:4px;border:1px solid var(--line);border-bottom:none;border-radius:8px 8px 0 0;padding:6px 8px;background:#fafbfe}
+  .rte-toolbar button{width:auto;min-width:30px;height:30px;padding:0 8px;background:#fff;border:1px solid var(--line);border-radius:6px;font-size:14px;line-height:1;display:inline-flex;align-items:center;justify-content:center}
+  .rte-toolbar button:hover{border-color:var(--brand);color:var(--brand)}
+  .rte-toolbar .sep{width:1px;height:20px;background:var(--line);margin:0 3px}
+  .rte-toolbar .sw{display:inline-block;width:16px;height:16px;border-radius:3px;border:1px solid rgba(0,0,0,.15)}
+  .rte-toolbar .sw-none{background:repeating-linear-gradient(45deg,#fff,#fff 3px,#e03131 3px,#e03131 4px)}
+  .rte{border:1px solid var(--line);border-radius:0 0 8px 8px;padding:10px 11px;min-height:110px;max-height:320px;overflow:auto;font-size:14px;line-height:1.6;white-space:pre-wrap;background:#fff}
+  .rte:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-l)}
+  .rte:empty:before{content:attr(data-placeholder);color:#adb5bd}
   .chips{display:flex;gap:8px;flex-wrap:wrap}
   .chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:20px;padding:7px 15px;cursor:pointer;font-size:14px;user-select:none;background:#fff}
   .chip input{width:auto;margin:0}
@@ -221,7 +231,23 @@
     </div>
     <div class="field">
       <label>說明（做了什麼）</label>
-      <textarea id="fDesc" placeholder="這次優化的內容、原因、成效…"></textarea>
+      <div class="rte-toolbar" id="rteToolbar">
+        <button type="button" data-cmd="bold" title="粗體"><b>B</b></button>
+        <button type="button" data-cmd="italic" title="斜體"><i>I</i></button>
+        <button type="button" data-cmd="underline" title="底線"><u>U</u></button>
+        <span class="sep"></span>
+        <button type="button" data-cmd="hiliteColor" data-value="#fff3bf" title="黃底"><span class="sw" style="background:#fff3bf"></span></button>
+        <button type="button" data-cmd="hiliteColor" data-value="#d3f9d8" title="綠底"><span class="sw" style="background:#d3f9d8"></span></button>
+        <button type="button" data-cmd="hiliteColor" data-value="#ffe3e3" title="紅底"><span class="sw" style="background:#ffe3e3"></span></button>
+        <button type="button" data-cmd="hiliteColor" data-value="transparent" title="移除底色"><span class="sw sw-none"></span></button>
+        <span class="sep"></span>
+        <button type="button" data-cmd="foreColor" data-value="#e03131" title="紅字"><span style="color:#e03131;font-weight:700">A</span></button>
+        <button type="button" data-cmd="foreColor" data-value="#1971c2" title="藍字"><span style="color:#1971c2;font-weight:700">A</span></button>
+        <button type="button" data-cmd="foreColor" data-value="#1e2433" title="預設字色"><span style="color:#1e2433;font-weight:700">A</span></button>
+        <span class="sep"></span>
+        <button type="button" data-cmd="removeFormat" title="清除格式">清除</button>
+      </div>
+      <div id="fDesc" class="rte" contenteditable="true" data-placeholder="這次優化的內容、原因、成效…"></div>
     </div>
     <div class="row">
       <div class="field">
@@ -413,7 +439,7 @@ function render(){
         ${(r.venues&&r.venues.length)?r.venues.map(v=>`<span class="venue">${esc(String(v).toUpperCase())}</span>`).join(""):""}
         <h3>${esc(r.title||"")}</h3>
       </div>
-      ${r.description?`<div class="desc">${esc(r.description)}</div>`:""}
+      ${r.description?`<div class="desc">${renderDesc(r.description)}</div>`:""}
       <div class="meta">
         ${r.created_at?`<span>🗓️ 建立 ${fmtDate(r.created_at)}</span>`:""}
         ${r.uat_date?`<span>🧪 上UAT ${r.uat_date}</span>`:""}
@@ -451,7 +477,10 @@ function openEdit(id){
   const vs = ((r && r.venues) || []).map(v=>String(v).toUpperCase());
   document.querySelectorAll("#fVenues input").forEach(c=> c.checked = vs.includes(c.value.toUpperCase()));
   $("fTitle").value    = r ? (r.title||"") : "";
-  $("fDesc").value     = r ? (r.description||"") : "";
+  // 說明：舊資料為純文字（可能含換行）、新資料為 HTML
+  const desc = r ? (r.description||"") : "";
+  if(/<[a-z/][\s\S]*>/i.test(desc)) $("fDesc").innerHTML = sanitizeHtml(desc);
+  else $("fDesc").textContent = desc;   // 純文字（白色 pre-wrap 保留換行）
   $("fUat").value      = r ? (r.uat_date||"") : "";
   $("fTestDone").value = r ? (r.test_done_date||"") : "";
   // datetime-local 需要 YYYY-MM-DDTHH:MM(:SS) 格式
@@ -477,6 +506,38 @@ function updateStatusPreview(){
 }
 ["fUat","fTestDone","fRelease"].forEach(id=> $(id).addEventListener("input", updateStatusPreview));
 
+// ---- 說明富文字編輯器 ----
+$("rteToolbar").addEventListener("mousedown", e=>{
+  const btn = e.target.closest("button[data-cmd]");
+  if(!btn) return;
+  e.preventDefault();                 // 保住編輯區的選取範圍
+  $("fDesc").focus();
+  try{ document.execCommand("styleWithCSS", false, true); }catch(_){}
+  document.execCommand(btn.dataset.cmd, false, btn.dataset.value || null);
+});
+
+// 允許的標籤/屬性以外一律清掉（作者為擁有者，仍防注入）
+function sanitizeHtml(html){
+  if(!html) return "";
+  const div = document.createElement("div");
+  div.innerHTML = html;
+  div.querySelectorAll("script,style,iframe,object,embed,link,meta,form,input").forEach(el=>el.remove());
+  div.querySelectorAll("*").forEach(el=>{
+    [...el.attributes].forEach(a=>{
+      const n = a.name.toLowerCase();
+      if(n.startsWith("on")) el.removeAttribute(a.name);                       // 事件屬性
+      else if((n==="href"||n==="src") && /^\s*javascript:/i.test(a.value)) el.removeAttribute(a.name);
+      else if(!["style","color","href","target","rel"].includes(n)) el.removeAttribute(a.name);
+    });
+    if(el.tagName==="A"){ el.setAttribute("target","_blank"); el.setAttribute("rel","noopener"); }
+  });
+  return div.innerHTML;
+}
+// contenteditable 內容是否實際為空
+function descIsEmpty(el){ return el.textContent.trim()==="" && !el.querySelector("img"); }
+// 顯示說明：新資料(HTML)消毒後渲染；舊資料(純文字)照字義跳脫
+function renderDesc(s){ return !s ? "" : (/<[a-z/][\s\S]*>/i.test(s) ? sanitizeHtml(s) : esc(s)); }
+
 $("saveBtn").addEventListener("click", async ()=>{
   const cat = $("fCategory").value.trim();
   const title = $("fTitle").value.trim();
@@ -489,7 +550,7 @@ $("saveBtn").addEventListener("click", async ()=>{
     category: cat,
     venues: venues.length ? venues : null,
     title,
-    description: $("fDesc").value.trim() || null,
+    description: descIsEmpty($("fDesc")) ? null : sanitizeHtml($("fDesc").innerHTML),
     uat_date: $("fUat").value || null,
     test_done_date: $("fTestDone").value || null,
     release_date: $("fRelease").value || null,   // datetime-local 字串，含時分秒
@@ -556,7 +617,7 @@ function itemBlock(r){
     <div class="h"><span class="cat">${esc(r.category||"未分類")}${(r.venues&&r.venues.length)?" · "+esc(r.venues.map(v=>String(v).toUpperCase()).join("/")):""}【${st.label}】</span>
       <span class="d">${esc(dates||"—")}</span></div>
     <h2>${esc(r.title||"")}</h2>
-    ${r.description?`<div class="desc">${esc(r.description)}</div>`:""}
+    ${r.description?`<div class="desc">${renderDesc(r.description)}</div>`:""}
     <div class="meta">
       ${r.executor?`執行人：${esc(r.executor)}　`:""}
       ${r.requirement_url?`需求書：<a href="${esc(r.requirement_url)}">${esc(r.requirement_url)}</a>`:""}
@@ -601,7 +662,7 @@ function exportOne(id){
       <tr><td class="k">更版日期時間</td><td>${fmtDT(r.release_date)||"—"}</td></tr>
       <tr><td class="k">執行人</td><td>${esc(r.executor||"—")}</td></tr>
       <tr><td class="k">需求書</td><td>${r.requirement_url?`<a href="${esc(r.requirement_url)}">${esc(r.requirement_url)}</a>`:"—"}</td></tr>
-      <tr><td class="k">說明</td><td style="white-space:pre-wrap">${esc(r.description||"—")}</td></tr>
+      <tr><td class="k">說明</td><td style="white-space:pre-wrap">${r.description?renderDesc(r.description):"—"}</td></tr>
     </table>`;
   runPdf(body, `優化紀錄_${safe(r.category)}_${safe(r.title)}.pdf`);
 }
