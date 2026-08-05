@@ -96,6 +96,7 @@
   .rte-toolbar .sep{width:1px;height:20px;background:var(--line);margin:0 3px}
   .rte-toolbar .sw{display:inline-block;width:16px;height:16px;border-radius:3px;border:1px solid rgba(0,0,0,.15)}
   .rte-toolbar .sw-none{background:repeating-linear-gradient(45deg,#fff,#fff 3px,#e03131 3px,#e03131 4px)}
+  .rte-toolbar .rte-size{width:auto;height:30px;padding:0 6px;border:1px solid var(--line);border-radius:6px;font-size:13px;background:#fff}
   .rte{border:1px solid var(--line);border-radius:0 0 8px 8px;padding:10px 11px;min-height:110px;max-height:320px;overflow:auto;font-size:14px;line-height:1.6;white-space:pre-wrap;background:#fff}
   .rte:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-l)}
   .rte:empty:before{content:attr(data-placeholder);color:#adb5bd}
@@ -244,6 +245,15 @@
         <button type="button" data-cmd="foreColor" data-value="#e03131" title="紅字"><span style="color:#e03131;font-weight:700">A</span></button>
         <button type="button" data-cmd="foreColor" data-value="#1971c2" title="藍字"><span style="color:#1971c2;font-weight:700">A</span></button>
         <button type="button" data-cmd="foreColor" data-value="#1e2433" title="預設字色"><span style="color:#1e2433;font-weight:700">A</span></button>
+        <span class="sep"></span>
+        <select id="rteFontSize" class="rte-size" title="字體大小">
+          <option value="">字級</option>
+          <option value="13px">小</option>
+          <option value="15px">預設</option>
+          <option value="18px">大</option>
+          <option value="24px">特大</option>
+          <option value="32px">超大</option>
+        </select>
         <span class="sep"></span>
         <button type="button" data-cmd="removeFormat" title="清除格式">清除</button>
       </div>
@@ -514,6 +524,42 @@ $("rteToolbar").addEventListener("mousedown", e=>{
   $("fDesc").focus();
   try{ document.execCommand("styleWithCSS", false, true); }catch(_){}
   document.execCommand(btn.dataset.cmd, false, btn.dataset.value || null);
+});
+
+// 記住編輯區最後的選取範圍（下拉選單會讓編輯區失焦）
+let savedRange = null;
+function saveSel(){
+  const s = window.getSelection();
+  if(s.rangeCount && $("fDesc").contains(s.anchorNode)) savedRange = s.getRangeAt(0).cloneRange();
+}
+function restoreSel(){
+  if(!savedRange) return;
+  const s = window.getSelection();
+  s.removeAllRanges(); s.addRange(savedRange);
+}
+$("fDesc").addEventListener("keyup", saveSel);
+$("fDesc").addEventListener("mouseup", saveSel);
+
+// 字體大小：先用 fontSize=7 標記選取，再換成指定 px 的 span（sanitize 會保留 style）
+function applyFontSize(px){
+  const ed = $("fDesc");
+  ed.focus(); restoreSel();
+  const sel = window.getSelection();
+  if(!sel.rangeCount || sel.isCollapsed){ alert("請先選取要調整大小的文字"); return; }
+  document.execCommand("styleWithCSS", false, false);
+  document.execCommand("fontSize", false, "7");
+  ed.querySelectorAll('font[size="7"]').forEach(f=>{
+    const span = document.createElement("span");
+    span.style.fontSize = px;
+    span.innerHTML = f.innerHTML;
+    f.replaceWith(span);
+  });
+  saveSel();
+}
+$("rteFontSize").addEventListener("change", function(){
+  const px = this.value;
+  this.selectedIndex = 0;             // 選完歸位回「字級」
+  if(px) applyFontSize(px);
 });
 
 // 允許的標籤/屬性以外一律清掉（作者為擁有者，仍防注入）
