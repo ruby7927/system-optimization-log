@@ -489,7 +489,11 @@ function refreshCategoryOptions(){
 
 // 狀態：依已填日期自動判斷（上正式 > 測試完成 > 測試中 > 待處理）
 function calcStatus(r){
-  if(r.release_date)   return {label:"更版完成", cls:"st-prod"};
+  // 更版完成：更版日期時間必須「已到／已過」；未來的更版日期先不算完成
+  if(r.release_date){
+    const rel = new Date(String(r.release_date).replace(" ","T"));
+    if(!isNaN(rel) && rel <= new Date()) return {label:"更版完成", cls:"st-prod"};
+  }
   if(r.test_done_date) return {label:"測試完成", cls:"st-done"};
   if(r.uat_date)       return {label:"測試中",   cls:"st-uat"};
   return {label:"待辦",   cls:"st-todo"};
