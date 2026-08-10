@@ -186,6 +186,8 @@
       <a class="snav-item on" href="#/" data-nav="home"><b>1.</b>優化紀錄（首頁）</a>
       <div class="snav-sec"><b>2.</b>需求書</div>
       <div id="navReq"></div>
+      <div class="snav-sec"><b>3.</b>會議記錄</div>
+      <div id="navMtg"></div>
     </nav>
   </aside>
 
@@ -253,6 +255,14 @@
       </div>
       <div id="mBody"></div>
     </section>
+
+    <section id="viewMtg" class="hidden">
+      <div class="mhead">
+        <h2 id="mtgTitle"></h2>
+        <button class="btn-primary hidden" id="addMtgBtn">＋ 新增會議</button>
+      </div>
+      <div id="mtgBody"></div>
+    </section>
   </main>
   </div>
 </div>
@@ -292,6 +302,75 @@
     <div class="modal-acts">
       <button class="btn-ghost" id="fileCancelBtn">取消</button>
       <button class="btn-primary" id="fileSaveBtn">儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== 會議記錄 新增/編輯 Modal ========== -->
+<div class="overlay hidden" id="mtgOverlay">
+  <div class="modal">
+    <h2 id="mtgModalTitle">新增會議</h2>
+    <input type="hidden" id="mtId">
+    <input type="hidden" id="mtCategory">
+    <div class="row">
+      <div class="field">
+        <label>會議日期 <span class="req">*</span></label>
+        <input type="date" id="mtDate">
+      </div>
+      <div class="field">
+        <label>場地（可複選）</label>
+        <div class="chips" id="mtVenues">
+          <label class="chip"><input type="checkbox" value="CB"> CB</label>
+          <label class="chip"><input type="checkbox" value="MX"> MX</label>
+          <label class="chip"><input type="checkbox" value="SIV"> SIV</label>
+        </div>
+      </div>
+    </div>
+    <div class="field">
+      <label>主題 <span class="req">*</span></label>
+      <input type="text" id="mtTitle" placeholder="會議主題">
+    </div>
+    <div class="field">
+      <label>會議內容</label>
+      <div class="rte-toolbar" id="mtgToolbar">
+        <button type="button" data-cmd="bold" title="粗體"><b>B</b></button>
+        <button type="button" data-cmd="italic" title="斜體"><i>I</i></button>
+        <button type="button" data-cmd="underline" title="底線"><u>U</u></button>
+        <span class="sep"></span>
+        <button type="button" data-cmd="hiliteColor" data-value="#fff3bf" title="黃底"><span class="sw" style="background:#fff3bf"></span></button>
+        <button type="button" data-cmd="hiliteColor" data-value="#d3f9d8" title="綠底"><span class="sw" style="background:#d3f9d8"></span></button>
+        <button type="button" data-cmd="hiliteColor" data-value="#ffe3e3" title="紅底"><span class="sw" style="background:#ffe3e3"></span></button>
+        <button type="button" data-cmd="hiliteColor" data-value="transparent" title="移除底色"><span class="sw sw-none"></span></button>
+        <span class="sep"></span>
+        <button type="button" data-cmd="foreColor" data-value="#e03131" title="紅字"><span style="color:#e03131;font-weight:700">A</span></button>
+        <button type="button" data-cmd="foreColor" data-value="#1971c2" title="藍字"><span style="color:#1971c2;font-weight:700">A</span></button>
+        <button type="button" data-cmd="foreColor" data-value="#1e2433" title="預設字色"><span style="color:#1e2433;font-weight:700">A</span></button>
+        <span class="sep"></span>
+        <select id="mtgFontSize" class="rte-size" title="字體大小">
+          <option value="">字級</option>
+          <option value="13px">小</option>
+          <option value="15px">預設</option>
+          <option value="18px">大</option>
+          <option value="24px">特大</option>
+          <option value="32px">超大</option>
+        </select>
+        <span class="sep"></span>
+        <button type="button" data-cmd="removeFormat" title="清除格式">清除</button>
+      </div>
+      <div id="mtgContent" class="rte" contenteditable="true" data-placeholder="會議討論內容、結論…"></div>
+    </div>
+    <div class="field">
+      <label>決議／待辦事項</label>
+      <textarea id="mtDecisions" placeholder="一項一行：待辦、負責人、期限…"></textarea>
+    </div>
+    <div class="field">
+      <label>相關連結</label>
+      <input type="url" id="mtLink" placeholder="https://…（會議簡報、錄影、文件）">
+    </div>
+    <div id="mtgModalMsg"></div>
+    <div class="modal-acts">
+      <button class="btn-ghost" id="mtgCancelBtn">取消</button>
+      <button class="btn-primary" id="mtgSaveBtn">儲存</button>
     </div>
   </div>
 </div>
@@ -615,51 +694,38 @@ function updateStatusPreview(){
 }
 ["fUat","fTestDone","fRelease"].forEach(id=> $(id).addEventListener("input", updateStatusPreview));
 
-// ---- 說明富文字編輯器 ----
-$("rteToolbar").addEventListener("mousedown", e=>{
-  const btn = e.target.closest("button[data-cmd]");
-  if(!btn) return;
-  e.preventDefault();                 // 保住編輯區的選取範圍
-  $("fDesc").focus();
-  try{ document.execCommand("styleWithCSS", false, true); }catch(_){}
-  document.execCommand(btn.dataset.cmd, false, btn.dataset.value || null);
-});
-
-// 記住編輯區最後的選取範圍（下拉選單會讓編輯區失焦）
-let savedRange = null;
-function saveSel(){
-  const s = window.getSelection();
-  if(s.rangeCount && $("fDesc").contains(s.anchorNode)) savedRange = s.getRangeAt(0).cloneRange();
-}
-function restoreSel(){
-  if(!savedRange) return;
-  const s = window.getSelection();
-  s.removeAllRanges(); s.addRange(savedRange);
-}
-$("fDesc").addEventListener("keyup", saveSel);
-$("fDesc").addEventListener("mouseup", saveSel);
-
-// 字體大小：先用 fontSize=7 標記選取，再換成指定 px 的 span（sanitize 會保留 style）
-function applyFontSize(px){
-  const ed = $("fDesc");
-  ed.focus(); restoreSel();
-  const sel = window.getSelection();
-  if(!sel.rangeCount || sel.isCollapsed){ alert("請先選取要調整大小的文字"); return; }
-  document.execCommand("styleWithCSS", false, false);
-  document.execCommand("fontSize", false, "7");
-  ed.querySelectorAll('font[size="7"]').forEach(f=>{
-    const span = document.createElement("span");
-    span.style.fontSize = px;
-    span.innerHTML = f.innerHTML;
-    f.replaceWith(span);
+// ---- 可重複使用的富文字編輯器（說明、會議內容共用） ----
+function initRichEditor(toolbar, editor, fontSel){
+  let saved = null;
+  const save = ()=>{ const s=window.getSelection(); if(s.rangeCount && editor.contains(s.anchorNode)) saved=s.getRangeAt(0).cloneRange(); };
+  const restore = ()=>{ if(saved){ const s=window.getSelection(); s.removeAllRanges(); s.addRange(saved); } };
+  editor.addEventListener("keyup", save);
+  editor.addEventListener("mouseup", save);
+  toolbar.addEventListener("mousedown", e=>{
+    const btn = e.target.closest("button[data-cmd]");
+    if(!btn) return;
+    e.preventDefault();               // 保住編輯區的選取範圍
+    editor.focus();
+    try{ document.execCommand("styleWithCSS", false, true); }catch(_){}
+    document.execCommand(btn.dataset.cmd, false, btn.dataset.value || null);
   });
-  saveSel();
+  if(fontSel){
+    fontSel.addEventListener("change", function(){
+      const px = this.value; this.selectedIndex = 0;
+      if(!px) return;
+      editor.focus(); restore();
+      const sel = window.getSelection();
+      if(!sel.rangeCount || sel.isCollapsed){ alert("請先選取要調整大小的文字"); return; }
+      document.execCommand("styleWithCSS", false, false);
+      document.execCommand("fontSize", false, "7");
+      editor.querySelectorAll('font[size="7"]').forEach(f=>{
+        const span = document.createElement("span"); span.style.fontSize = px; span.innerHTML = f.innerHTML; f.replaceWith(span);
+      });
+      save();
+    });
+  }
 }
-$("rteFontSize").addEventListener("change", function(){
-  const px = this.value;
-  this.selectedIndex = 0;             // 選完歸位回「字級」
-  if(px) applyFontSize(px);
-});
+initRichEditor($("rteToolbar"), $("fDesc"), $("rteFontSize"));
 
 // 允許的標籤/屬性以外一律清掉（作者為擁有者，仍防注入）
 function sanitizeHtml(html){
@@ -848,7 +914,8 @@ async function initReq(){
   }
   REQNAMES = visible.map(r=>r.name);
   buildReqNav(visible);
-  await loadFiles();
+  buildMtgNav(visible);
+  await Promise.all([loadFiles(), loadMeetings()]);
   if(!reqInited){
     window.addEventListener("hashchange", routeReq);
     reqInited = true;
@@ -910,19 +977,27 @@ function renderReq(system){
     </tr>`).join("")}</tbody></table></div>`;
 }
 
-// 路由：#/ 首頁、#/req/<系統>
+// 路由：#/ 首頁、#/req/<系統>、#/mtg/<系統>
 function routeReq(){
   const h = decodeURIComponent(location.hash.replace(/^#/,""));
-  const want = h.startsWith("/req/") ? h.slice(5) : null;
-  curSystem = (want && REQNAMES.includes(want)) ? want : null;
-  $("viewHome").classList.toggle("hidden", !!curSystem);
-  $("viewReq").classList.toggle("hidden", !curSystem);
+  const reqWant = h.startsWith("/req/") ? h.slice(5) : null;
+  const mtgWant = h.startsWith("/mtg/") ? h.slice(5) : null;
+  curSystem    = (reqWant && REQNAMES.includes(reqWant)) ? reqWant : null;
+  curMtgSystem = (mtgWant && REQNAMES.includes(mtgWant)) ? mtgWant : null;
+  const onReq = !!curSystem, onMtg = !!curMtgSystem;
+  $("viewHome").classList.toggle("hidden", onReq || onMtg);
+  $("viewReq").classList.toggle("hidden", !onReq);
+  $("viewMtg").classList.toggle("hidden", !onMtg);
   document.querySelectorAll(".snav-item").forEach(a=>{
-    const isHome = a.dataset.nav === "home";
-    const t = isHome ? null : decodeURIComponent((a.getAttribute("href")||"").replace("#/req/",""));
-    a.classList.toggle("on", isHome ? !curSystem : t===curSystem);
+    const href = a.getAttribute("href") || "";
+    let on = false;
+    if(a.dataset.nav === "home") on = !onReq && !onMtg;
+    else if(href.startsWith("#/req/")) on = decodeURIComponent(href.replace("#/req/","")) === curSystem;
+    else if(href.startsWith("#/mtg/")) on = decodeURIComponent(href.replace("#/mtg/","")) === curMtgSystem;
+    a.classList.toggle("on", on);
   });
-  if(curSystem) renderReq(curSystem);
+  if(onReq) renderReq(curSystem);
+  if(onMtg) renderMtg(curMtgSystem);
   window.scrollTo(0,0);
 }
 
@@ -984,6 +1059,108 @@ async function delFile(id){
   await loadFiles();
 }
 window.delFile = delFile;
+
+// ================= 會議記錄 =================
+let MEETINGS = [], curMtgSystem = null;
+
+function buildMtgNav(list){
+  $("navMtg").innerHTML = list.map((m,i)=>
+    `<a class="snav-item snav-sub" href="#/mtg/${encodeURIComponent(m.name)}"><b>3.${i+1}</b>${esc(m.name)}</a>`
+  ).join("") || `<div class="snav-item snav-sub" style="color:var(--muted)"><b></b>（無）</div>`;
+}
+
+async function loadMeetings(){
+  const {data, error} = await sb.from("meeting_notes").select("*").order("meet_date",{ascending:false});
+  if(error){ console.warn("meeting_notes 讀取失敗：", error.message); MEETINGS = []; }
+  else MEETINGS = data || [];
+  if(curMtgSystem) renderMtg(curMtgSystem);
+}
+
+function renderMtg(system){
+  $("mtgTitle").textContent = system + "　會議記錄";
+  $("addMtgBtn").classList.toggle("hidden", !IS_OWNER);
+  const rows = MEETINGS.filter(m=>m.category===system);
+  if(!rows.length){
+    $("mtgBody").innerHTML = `<div class="empty">目前沒有會議記錄。${IS_OWNER?'點右上「＋ 新增會議」加入第一筆。':''}</div>`;
+    return;
+  }
+  $("mtgBody").innerHTML = `<div class="list">${rows.map(m=>`
+    <div class="rec">
+      <div class="top">
+        <span class="date">📅 ${m.meet_date||"—"}</span>
+        ${(m.venues&&m.venues.length)?m.venues.map(v=>`<span class="venue">${esc(String(v).toUpperCase())}</span>`).join(""):""}
+        <h3>${esc(m.title||"")}</h3>
+      </div>
+      ${m.content?`<div class="desc">${renderDesc(m.content)}</div>`:""}
+      ${m.decisions?`<div class="desc" style="margin-top:10px"><b>決議／待辦：</b><br>${esc(m.decisions)}</div>`:""}
+      ${m.link?`<div class="meta"><span>🔗 <a href="${esc(m.link)}" target="_blank" rel="noopener">相關連結</a></span></div>`:""}
+      ${IS_OWNER?`<div class="acts">
+        <button class="btn-ghost" onclick="editMtg('${m.id}')">編輯</button>
+        <button class="btn-danger" onclick="delMtg('${m.id}')">刪除</button>
+      </div>`:""}
+    </div>`).join("")}</div>`;
+}
+
+$("addMtgBtn").addEventListener("click", ()=>openMtg(null));
+$("mtgCancelBtn").addEventListener("click", ()=>$("mtgOverlay").classList.add("hidden"));
+$("mtgOverlay").addEventListener("click", e=>{ if(e.target.id==="mtgOverlay") $("mtgOverlay").classList.add("hidden"); });
+
+function openMtg(id){
+  if(!IS_OWNER) return;
+  const m = id ? MEETINGS.find(x=>x.id===id) : null;
+  $("mtgModalTitle").textContent = m ? "編輯會議" : "新增會議";
+  $("mtId").value       = m ? m.id : "";
+  $("mtCategory").value = m ? m.category : curMtgSystem;
+  $("mtDate").value     = m ? (m.meet_date||"") : new Date().toISOString().slice(0,10);
+  const vs = ((m && m.venues) || []).map(v=>String(v).toUpperCase());
+  document.querySelectorAll("#mtVenues input").forEach(c=> c.checked = vs.includes(c.value.toUpperCase()));
+  $("mtTitle").value    = m ? (m.title||"") : "";
+  const c = m ? (m.content||"") : "";
+  if(/<[a-z/][\s\S]*>/i.test(c)) $("mtgContent").innerHTML = sanitizeHtml(c);
+  else $("mtgContent").textContent = c;
+  $("mtDecisions").value = m ? (m.decisions||"") : "";
+  $("mtLink").value      = m ? (m.link||"") : "";
+  $("mtgModalMsg").innerHTML = "";
+  $("mtgOverlay").classList.remove("hidden");
+  $("mtTitle").focus();
+}
+window.editMtg = openMtg;
+
+$("mtgSaveBtn").addEventListener("click", async ()=>{
+  const title = $("mtTitle").value.trim(), date = $("mtDate").value;
+  if(!date || !title){ $("mtgModalMsg").innerHTML='<div class="msg err">會議日期與主題為必填</div>'; return; }
+  const venues = [...document.querySelectorAll("#mtVenues input:checked")].map(c=>c.value);
+  const payload = {
+    category: $("mtCategory").value,
+    meet_date: date,
+    title,
+    content: descIsEmpty($("mtgContent")) ? null : sanitizeHtml($("mtgContent").innerHTML),
+    decisions: $("mtDecisions").value.trim() || null,
+    venues: venues.length ? venues : null,
+    link: $("mtLink").value.trim() || null
+  };
+  $("mtgSaveBtn").disabled = true;
+  const id = $("mtId").value;
+  let error;
+  if(id) ({error} = await sb.from("meeting_notes").update(payload).eq("id", id));
+  else   ({error} = await sb.from("meeting_notes").insert(payload));
+  $("mtgSaveBtn").disabled = false;
+  if(error){ $("mtgModalMsg").innerHTML=`<div class="msg err">儲存失敗：${esc(error.message)}</div>`; return; }
+  $("mtgOverlay").classList.add("hidden");
+  await loadMeetings();
+});
+
+async function delMtg(id){
+  if(!IS_OWNER) return;
+  const m = MEETINGS.find(x=>x.id===id);
+  if(!confirm(`確定刪除會議「${m?m.title:""}」？`)) return;
+  const {error} = await sb.from("meeting_notes").delete().eq("id", id);
+  if(error){ alert("刪除失敗："+error.message); return; }
+  await loadMeetings();
+}
+window.delMtg = delMtg;
+
+initRichEditor($("mtgToolbar"), $("mtgContent"), $("mtgFontSize"));
 
 // ================= 工具 =================
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));}
