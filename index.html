@@ -77,6 +77,9 @@
   .fopen:hover{text-decoration:underline}
   .facts{display:flex;gap:6px;white-space:nowrap}
   .btn-sm{padding:6px 12px;font-size:13px}
+  .mfilter{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--card);padding:12px 14px;border-radius:10px;box-shadow:var(--shadow);margin-bottom:16px}
+  .mfilter label{font-size:13px;color:var(--muted)}
+  .mfilter input{width:auto}
   @media(max-width:760px){
     .shell{grid-template-columns:1fr;gap:14px;padding:16px}
     .side{position:static}
@@ -260,6 +263,13 @@
       <div class="mhead">
         <h2 id="mtgTitle"></h2>
         <button class="btn-primary hidden" id="addMtgBtn">＋ 新增會議</button>
+      </div>
+      <div class="mfilter">
+        <label>會議日期</label>
+        <input type="date" id="mtgFrom" aria-label="起始日期">
+        <span>—</span>
+        <input type="date" id="mtgTo" aria-label="結束日期">
+        <button class="btn-ghost btn-sm" id="mtgClear">清除</button>
       </div>
       <div id="mtgBody"></div>
     </section>
@@ -1079,9 +1089,17 @@ async function loadMeetings(){
 function renderMtg(system){
   $("mtgTitle").textContent = system + "　會議記錄";
   $("addMtgBtn").classList.toggle("hidden", !IS_OWNER);
-  const rows = MEETINGS.filter(m=>m.category===system);
+  const from = $("mtgFrom").value, to = $("mtgTo").value;
+  const all = MEETINGS.filter(m=>m.category===system);
+  const rows = all.filter(m=>{
+    if(from && (!m.meet_date || m.meet_date < from)) return false;
+    if(to   && (!m.meet_date || m.meet_date > to)) return false;
+    return true;
+  });
   if(!rows.length){
-    $("mtgBody").innerHTML = `<div class="empty">目前沒有會議記錄。${IS_OWNER?'點右上「＋ 新增會議」加入第一筆。':''}</div>`;
+    $("mtgBody").innerHTML = all.length
+      ? `<div class="empty">此日期區間沒有會議記錄。<br>調整或按「清除」看全部。</div>`
+      : `<div class="empty">目前沒有會議記錄。${IS_OWNER?'點右上「＋ 新增會議」加入第一筆。':''}</div>`;
     return;
   }
   $("mtgBody").innerHTML = `<div class="list">${rows.map(m=>`
@@ -1100,6 +1118,9 @@ function renderMtg(system){
       </div>`:""}
     </div>`).join("")}</div>`;
 }
+
+["mtgFrom","mtgTo"].forEach(id=> $(id).addEventListener("input", ()=>{ if(curMtgSystem) renderMtg(curMtgSystem); }));
+$("mtgClear").addEventListener("click", ()=>{ $("mtgFrom").value=""; $("mtgTo").value=""; if(curMtgSystem) renderMtg(curMtgSystem); });
 
 $("addMtgBtn").addEventListener("click", ()=>openMtg(null));
 $("mtgCancelBtn").addEventListener("click", ()=>$("mtgOverlay").classList.add("hidden"));
