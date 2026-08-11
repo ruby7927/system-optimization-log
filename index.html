@@ -633,9 +633,9 @@ function render(){
     <div class="rec">
       <div class="top">
         <span class="cat">${esc(r.category||"未分類")}</span>
-        <span class="badge-st ${st.cls}">${st.label}</span>
         ${(r.venues&&r.venues.length)?r.venues.map(v=>`<span class="venue">${esc(String(v).toUpperCase())}</span>`).join(""):""}
         <h3>${esc(r.title||"")}</h3>
+        <span class="badge-st ${st.cls}">${st.label}</span>
       </div>
       ${r.description?`<div class="desc">${renderDesc(r.description)}</div>`:""}
       <div class="meta">
@@ -648,7 +648,6 @@ function render(){
       </div>
       <div class="acts">
         <button class="btn-ghost" onclick="openEdit('${r.id}')">編輯</button>
-        <button class="btn-ghost" onclick="exportOne('${r.id}')">📄 匯出 PDF</button>
         <button class="btn-danger" onclick="delRec('${r.id}')">刪除</button>
       </div>
     </div>`;
