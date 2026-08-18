@@ -87,6 +87,7 @@
   }
 
   .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;background:var(--card);padding:16px;border-radius:12px;box-shadow:var(--shadow);margin-bottom:18px}
+  .toolbar .fbreak{flex-basis:100%;height:0;margin:0;padding:0}
   .toolbar .f{display:flex;flex-direction:column;gap:5px}
   .toolbar .f label{font-size:12px;color:var(--muted)}
   .toolbar .grow{flex:1;min-width:180px}
@@ -225,6 +226,7 @@
           <option value="更版完成">更版完成</option>
         </select>
       </div>
+      <div class="fbreak"></div>
       <div class="f">
         <label>上UAT起日</label>
         <input type="date" id="qFrom">
