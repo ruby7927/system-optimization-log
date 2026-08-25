@@ -561,8 +561,7 @@ function leaveApp(){
 // ================= 資料讀取 =================
 async function loadData(){
   const {data, error} = await sb.from("optimizations")
-    .select("*").order("uat_date",{ascending:false, nullsFirst:false})
-    .order("created_at",{ascending:false});
+    .select("*").order("created_at",{ascending:false});
   if(error){ alert("讀取失敗："+error.message); return; }
   ALL = data || [];
   refreshCategoryOptions();
