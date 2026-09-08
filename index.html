@@ -80,6 +80,31 @@
   .mfilter{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--card);padding:12px 14px;border-radius:10px;box-shadow:var(--shadow);margin-bottom:16px}
   .mfilter label{font-size:13px;color:var(--muted)}
   .mfilter input{width:auto}
+  /* ---- 專案排程時間軸 ---- */
+  .panel{background:var(--card);border-radius:12px;box-shadow:var(--shadow);padding:18px;margin-bottom:16px}
+  .schbar{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap}
+  .schbar .f{display:flex;flex-direction:column;gap:4px}
+  .schbar .f label{font-size:12px;color:var(--muted)}
+  .schbar input,.schbar select{width:auto}
+  .tl-scroll{overflow-x:auto;padding:4px 0 2px}
+  .tl-track{position:relative;height:210px}
+  .axis-line{position:absolute;left:40px;top:150px;height:2px;background:#3a3f4b}
+  .tick-dot{position:absolute;top:145px;width:11px;height:11px;border-radius:50%;background:#9aa0ad;transform:translateX(-50%)}
+  .tick-date{position:absolute;top:166px;font-size:12px;color:var(--muted);transform:translateX(-50%);white-space:nowrap}
+  .ms{position:absolute;top:24px;width:100px;transform:translateX(-50%);text-align:center;font-size:13px;font-weight:600;
+      line-height:1.3;padding:9px 6px;border-radius:12px;border:1px solid #d7dbe6;box-shadow:0 1px 2px rgba(20,30,60,.10);
+      cursor:pointer;transition:.12s;background:#fff}
+  .ms:hover{transform:translateX(-50%) translateY(-2px);border-color:var(--brand)}
+  .ms.sel{box-shadow:0 0 0 3px var(--brand-l);border-color:var(--brand)}
+  .ms .ms-date{display:block;font-weight:500;color:#6b7488;font-size:11px;margin-top:3px}
+  .ms-mark{position:absolute;top:143px;width:15px;height:15px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.15);transform:translateX(-50%)}
+  .ms-stem{position:absolute;width:2px;background:#c9cdd8;transform:translateX(-50%)}
+  .ms-edit{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;background:#fafbfe;border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:14px}
+  .ms-edit .fld{display:flex;flex-direction:column;gap:4px}
+  .ms-edit label{font-size:12px;color:var(--muted)}
+  .ms-edit input[type=color]{width:46px;height:38px;padding:2px;cursor:pointer}
+  .ms-edit .grow{flex:1;min-width:150px}
+  .ms-edit .grow input{width:100%}
   @media(max-width:760px){
     .shell{grid-template-columns:1fr;gap:14px;padding:16px}
     .side{position:static}
@@ -188,9 +213,10 @@
   <aside class="side">
     <nav class="snav" aria-label="頁面導覽">
       <a class="snav-item on" href="#/" data-nav="home"><b>1.</b>優化紀錄（首頁）</a>
-      <div class="snav-sec"><b>2.</b>需求書</div>
+      <a class="snav-item" href="#/sched" data-nav="sched"><b>2.</b>專案排程</a>
+      <div class="snav-sec"><b>3.</b>需求書</div>
       <div id="navReq"></div>
-      <div class="snav-sec"><b>3.</b>會議記錄</div>
+      <div class="snav-sec"><b>4.</b>會議記錄</div>
       <div id="navMtg"></div>
     </nav>
   </aside>
@@ -250,6 +276,64 @@
     </div>
 
     <div class="list" id="list"></div>
+    </section>
+
+    <section id="viewSched" class="hidden">
+      <div class="panel">
+        <div class="schbar">
+          <div class="f">
+            <label>專案</label>
+            <select id="scProj"></select>
+          </div>
+          <div class="f">
+            <label>開始</label>
+            <input type="date" id="scStart">
+          </div>
+          <div class="f">
+            <label>結束</label>
+            <input type="date" id="scEnd">
+          </div>
+          <button class="btn-primary hidden" id="scAddBtn">＋ 新增里程碑</button>
+          <button class="btn-primary hidden" id="scSaveBtn">儲存</button>
+          <span id="scSaveHint" style="font-size:12.5px;color:var(--muted)"></span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="tl-scroll"><div class="tl-track" id="scTrack"></div></div>
+      </div>
+
+      <div class="panel">
+        <div class="card-head" style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+          <h2 style="font-size:16px;margin:0;flex:1">內容 / 備註 — <span class="selname" id="scSelName" style="font-weight:700;color:var(--brand-d)">整體專案</span></h2>
+        </div>
+        <div class="ms-edit hidden" id="scMsEdit">
+          <div class="fld grow"><label>里程碑名稱</label><input type="text" id="scEdLabel" placeholder="例：CRUD+功能開發"></div>
+          <div class="fld"><label>日期</label><input type="date" id="scEdDate"></div>
+          <div class="fld"><label>顏色</label><input type="color" id="scEdColor" value="#ffffff"></div>
+          <div class="fld"><label>&nbsp;</label><button class="btn-danger" id="scEdDel">刪除里程碑</button></div>
+        </div>
+        <div class="rte-toolbar" id="scTb">
+          <button type="button" data-cmd="bold" title="粗體"><b>B</b></button>
+          <button type="button" data-cmd="italic" title="斜體"><i>I</i></button>
+          <button type="button" data-cmd="underline" title="底線"><u>U</u></button>
+          <span class="sep"></span>
+          <button type="button" data-cmd="hiliteColor" data-value="#fff3bf" title="黃底"><span class="sw" style="background:#fff3bf"></span></button>
+          <button type="button" data-cmd="hiliteColor" data-value="#d3f9d8" title="綠底"><span class="sw" style="background:#d3f9d8"></span></button>
+          <button type="button" data-cmd="hiliteColor" data-value="transparent" title="移除底色"><span class="sw sw-none"></span></button>
+          <span class="sep"></span>
+          <button type="button" data-cmd="foreColor" data-value="#e03131" title="紅字"><span style="color:#e03131;font-weight:700">A</span></button>
+          <button type="button" data-cmd="foreColor" data-value="#1971c2" title="藍字"><span style="color:#1971c2;font-weight:700">A</span></button>
+          <span class="sep"></span>
+          <select id="scFontSize" class="rte-size" title="字體大小">
+            <option value="">字級</option><option value="13px">小</option><option value="15px">預設</option>
+            <option value="18px">大</option><option value="24px">特大</option><option value="32px">超大</option>
+          </select>
+          <span class="sep"></span>
+          <button type="button" data-cmd="removeFormat" title="清除格式">清除</button>
+        </div>
+        <div id="scEditor" class="rte" contenteditable="true" data-placeholder="撰寫此項目的內容…"></div>
+      </div>
     </section>
 
     <section id="viewReq" class="hidden">
@@ -925,7 +1009,9 @@ async function initReq(){
   REQNAMES = visible.map(r=>r.name);
   buildReqNav(visible);
   buildMtgNav(visible);
-  await Promise.all([loadFiles(), loadMeetings()]);
+  initSched(visible);
+  await Promise.all([loadFiles(), loadMeetings(), loadSchedules()]);
+  if(SCHED_PROJECTS.length) openProject(SCHED_PROJECTS[0]);
   if(!reqInited){
     window.addEventListener("hashchange", routeReq);
     reqInited = true;
@@ -935,7 +1021,7 @@ async function initReq(){
 
 function buildReqNav(list){
   $("navReq").innerHTML = list.map((m,i)=>
-    `<a class="snav-item snav-sub" href="#/req/${encodeURIComponent(m.name)}"><b>2.${i+1}</b>${esc(m.name)}</a>`
+    `<a class="snav-item snav-sub" href="#/req/${encodeURIComponent(m.name)}"><b>3.${i+1}</b>${esc(m.name)}</a>`
   ).join("") || `<div class="snav-item snav-sub" style="color:var(--muted)"><b></b>（無）</div>`;
 }
 
@@ -992,22 +1078,26 @@ function routeReq(){
   const h = decodeURIComponent(location.hash.replace(/^#/,""));
   const reqWant = h.startsWith("/req/") ? h.slice(5) : null;
   const mtgWant = h.startsWith("/mtg/") ? h.slice(5) : null;
+  const onSched = (h === "/sched");
   curSystem    = (reqWant && REQNAMES.includes(reqWant)) ? reqWant : null;
   curMtgSystem = (mtgWant && REQNAMES.includes(mtgWant)) ? mtgWant : null;
   const onReq = !!curSystem, onMtg = !!curMtgSystem;
-  $("viewHome").classList.toggle("hidden", onReq || onMtg);
+  $("viewHome").classList.toggle("hidden", onReq || onMtg || onSched);
+  $("viewSched").classList.toggle("hidden", !onSched);
   $("viewReq").classList.toggle("hidden", !onReq);
   $("viewMtg").classList.toggle("hidden", !onMtg);
   document.querySelectorAll(".snav-item").forEach(a=>{
     const href = a.getAttribute("href") || "";
     let on = false;
-    if(a.dataset.nav === "home") on = !onReq && !onMtg;
+    if(a.dataset.nav === "home") on = !onReq && !onMtg && !onSched;
+    else if(a.dataset.nav === "sched") on = onSched;
     else if(href.startsWith("#/req/")) on = decodeURIComponent(href.replace("#/req/","")) === curSystem;
     else if(href.startsWith("#/mtg/")) on = decodeURIComponent(href.replace("#/mtg/","")) === curMtgSystem;
     a.classList.toggle("on", on);
   });
   if(onReq) renderReq(curSystem);
   if(onMtg) renderMtg(curMtgSystem);
+  if(onSched) buildSchedTimeline();
   window.scrollTo(0,0);
 }
 
@@ -1075,7 +1165,7 @@ let MEETINGS = [], curMtgSystem = null;
 
 function buildMtgNav(list){
   $("navMtg").innerHTML = list.map((m,i)=>
-    `<a class="snav-item snav-sub" href="#/mtg/${encodeURIComponent(m.name)}"><b>3.${i+1}</b>${esc(m.name)}</a>`
+    `<a class="snav-item snav-sub" href="#/mtg/${encodeURIComponent(m.name)}"><b>4.${i+1}</b>${esc(m.name)}</a>`
   ).join("") || `<div class="snav-item snav-sub" style="color:var(--muted)"><b></b>（無）</div>`;
 }
 
@@ -1182,6 +1272,150 @@ async function delMtg(id){
 window.delMtg = delMtg;
 
 initRichEditor($("mtgToolbar"), $("mtgContent"), $("mtgFontSize"));
+
+// ================= 專案排程 =================
+let SCHEDS = {}, SCHED_PROJECTS = [], curProj = null, curMs = -1;
+const dayMs = 86400000;
+const parseD = d => new Date(d + "T00:00:00");
+const fmtMD = t => { const d = new Date(t); return (d.getMonth()+1) + "/" + d.getDate(); };
+const PAD = 40, PPD = 15;
+
+function initSched(visible){
+  SCHED_PROJECTS = visible.map(r=>r.name);
+  $("scProj").innerHTML = SCHED_PROJECTS.length
+    ? SCHED_PROJECTS.map(n=>`<option>${esc(n)}</option>`).join("")
+    : `<option value="">（無可檢視的專案）</option>`;
+  const ro = !IS_OWNER;                 // 工程師唯讀
+  $("scAddBtn").classList.toggle("hidden", ro);
+  $("scSaveBtn").classList.toggle("hidden", ro);
+  $("scStart").disabled = ro; $("scEnd").disabled = ro;
+  $("scEditor").setAttribute("contenteditable", ro ? "false" : "true");
+  $("scTb").style.display = ro ? "none" : "";
+}
+
+async function loadSchedules(){
+  const {data, error} = await sb.from("project_schedules").select("*");
+  SCHEDS = {};
+  if(error) console.warn("project_schedules 讀取失敗：", error.message);
+  else (data||[]).forEach(r=>{ if(!Array.isArray(r.milestones)) r.milestones=[]; SCHEDS[r.category]=r; });
+}
+
+function getSched(cat){
+  if(!SCHEDS[cat]) SCHEDS[cat] = {category:cat, start_date:null, end_date:null, general_note:"", milestones:[]};
+  if(!Array.isArray(SCHEDS[cat].milestones)) SCHEDS[cat].milestones = [];
+  return SCHEDS[cat];
+}
+function curMsObj(){ return (curProj!=null && curMs>=0) ? getSched(curProj).milestones[curMs] : null; }
+
+function openProject(cat){
+  curProj = cat; curMs = -1;
+  const s = getSched(cat);
+  $("scStart").value = s.start_date || "";
+  $("scEnd").value   = s.end_date || "";
+  selectSchedContent(-1);
+  buildSchedTimeline();
+}
+
+function buildSchedTimeline(){
+  const track = $("scTrack");
+  if(!curProj){ track.innerHTML=""; track.style.width="100%"; return; }
+  const s = getSched(curProj);
+  if(!s.start_date || !s.end_date){
+    track.innerHTML = '<div class="hint" style="padding:20px;color:var(--muted)">設定專案開始與結束日期後即可顯示時間軸。</div>';
+    track.style.width="100%"; return;
+  }
+  let start = parseD(s.start_date).getTime(), end = parseD(s.end_date).getTime();
+  if(end < start){ const t=start; start=end; end=t; }
+  s.milestones.forEach(m=>{ if(m.date){ const t=parseD(m.date).getTime(); if(t<start)start=t; if(t>end)end=t; }});
+  const totalDays = Math.max(1, Math.round((end-start)/dayMs));
+  const width = PAD*2 + totalDays*PPD;
+  const x = t => PAD + Math.round((t-start)/dayMs)*PPD;
+  let html = `<div class="axis-line" style="width:${width-PAD*2}px"></div>`;
+  for(let t=start; t<=end+dayMs; t+=7*dayMs){
+    html += `<div class="tick-dot" style="left:${x(t)}px"></div><div class="tick-date" style="left:${x(t)}px">${fmtMD(t)}</div>`;
+  }
+  s.milestones.forEach((m,i)=>{
+    if(!m.date) return;
+    const px = x(parseD(m.date).getTime());
+    html += `<div class="ms-stem" style="left:${px}px;top:74px;height:70px"></div>`;
+    html += `<div class="ms-mark" style="left:${px}px;background:${esc(m.color||'#fff')}"></div>`;
+    html += `<div class="ms ${i===curMs?'sel':''}" data-i="${i}" style="left:${px}px;background:${esc(m.color||'#fff')}">${esc(m.label||'')}<span class="ms-date">${esc(m.date)}</span></div>`;
+  });
+  track.style.width = width + "px";
+  track.innerHTML = html;
+  track.querySelectorAll(".ms").forEach(el=> el.addEventListener("click", ()=> selectSchedContent(+el.dataset.i)));
+}
+
+function schedEditorToMem(){
+  if(curProj==null) return;
+  const s = getSched(curProj);
+  if(curMs === -1) s.general_note = $("scEditor").innerHTML;
+  else if(s.milestones[curMs]) s.milestones[curMs].content = $("scEditor").innerHTML;
+}
+function setSchedEditor(html){
+  const h = html || "";
+  if(/<[a-z/][\s\S]*>/i.test(h)) $("scEditor").innerHTML = sanitizeHtml(h);
+  else $("scEditor").textContent = h;
+}
+function selectSchedContent(i){
+  schedEditorToMem();
+  curMs = i;
+  const s = getSched(curProj);
+  document.querySelectorAll("#scTrack .ms").forEach(x=>x.classList.remove("sel"));
+  if(i === -1){
+    $("scSelName").textContent = "整體專案";
+    $("scMsEdit").classList.add("hidden");
+    setSchedEditor(s.general_note || "");
+  }else{
+    const m = s.milestones[i];
+    $("scSelName").textContent = m.label || "（未命名）";
+    $("scMsEdit").classList.toggle("hidden", !IS_OWNER);
+    $("scEdLabel").value = m.label||""; $("scEdDate").value = m.date||""; $("scEdColor").value = m.color||"#ffffff";
+    setSchedEditor(m.content || "");
+    const el = document.querySelector(`#scTrack .ms[data-i="${i}"]`); if(el) el.classList.add("sel");
+  }
+}
+
+$("scProj").addEventListener("change", ()=> openProject($("scProj").value));
+$("scStart").addEventListener("change", ()=>{ if(curProj!=null){ getSched(curProj).start_date=$("scStart").value||null; buildSchedTimeline(); }});
+$("scEnd").addEventListener("change",   ()=>{ if(curProj!=null){ getSched(curProj).end_date=$("scEnd").value||null; buildSchedTimeline(); }});
+$("scEdLabel").addEventListener("input", ()=>{ const m=curMsObj(); if(m){ m.label=$("scEdLabel").value; $("scSelName").textContent=m.label||"（未命名）"; buildSchedTimeline(); }});
+$("scEdDate").addEventListener("change", ()=>{ const m=curMsObj(); if(m){ m.date=$("scEdDate").value; buildSchedTimeline(); }});
+$("scEdColor").addEventListener("input", ()=>{ const m=curMsObj(); if(m){ m.color=$("scEdColor").value; buildSchedTimeline(); }});
+$("scEdDel").addEventListener("click", ()=>{
+  if(curMs<0) return;
+  const s=getSched(curProj);
+  if(!confirm(`刪除里程碑「${s.milestones[curMs].label||""}」？`)) return;
+  s.milestones.splice(curMs,1); selectSchedContent(-1); buildSchedTimeline();
+});
+$("scAddBtn").addEventListener("click", ()=>{
+  if(curProj==null) return;
+  schedEditorToMem();
+  const s = getSched(curProj);
+  const times = s.milestones.filter(m=>m.date).map(m=>parseD(m.date).getTime());
+  const base = times.length ? Math.max(...times) : (s.start_date ? parseD(s.start_date).getTime() : Date.now());
+  const d = new Date(base + 7*dayMs);
+  const ds = d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+  s.milestones.push({label:"新里程碑", date:ds, color:"#ffffff", content:""});
+  buildSchedTimeline();
+  selectSchedContent(s.milestones.length-1);
+  $("scEdLabel").focus();
+});
+$("scSaveBtn").addEventListener("click", async ()=>{
+  if(!IS_OWNER || curProj==null) return;
+  schedEditorToMem();
+  const s = getSched(curProj);
+  const payload = { category: curProj, start_date: s.start_date||null, end_date: s.end_date||null,
+                    general_note: s.general_note||null, milestones: s.milestones||[] };
+  $("scSaveBtn").disabled = true; $("scSaveHint").textContent = "儲存中…";
+  const {error} = await sb.from("project_schedules").upsert(payload, {onConflict:"category"});
+  $("scSaveBtn").disabled = false;
+  if(error){ $("scSaveHint").textContent = "儲存失敗："+error.message; return; }
+  $("scSaveHint").textContent = "已儲存 ✓";
+  setTimeout(()=>{ $("scSaveHint").textContent=""; }, 2500);
+});
+
+initRichEditor($("scTb"), $("scEditor"), $("scFontSize"));
 
 // ================= 工具 =================
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));}
