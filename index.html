@@ -280,11 +280,23 @@
 
     <section id="viewSched" class="hidden">
       <div class="panel">
-        <div class="schbar">
+        <div class="schbar" style="margin-bottom:12px">
           <div class="f">
             <label>專案</label>
             <select id="scProj"></select>
           </div>
+          <div class="f">
+            <label>時間線</label>
+            <select id="scCanvas"></select>
+          </div>
+          <div class="f hidden" id="scNameWrap">
+            <label>時間線名稱</label>
+            <input type="text" id="scCanvasName" placeholder="例：2026下半年排程" style="min-width:180px">
+          </div>
+          <button class="btn-primary hidden" id="scAddCanvas">＋ 新增時間線</button>
+          <button class="btn-danger hidden" id="scDelCanvas">刪除此時間線</button>
+        </div>
+        <div class="schbar">
           <div class="f">
             <label>開始</label>
             <input type="date" id="scStart">
@@ -1273,12 +1285,14 @@ window.delMtg = delMtg;
 
 initRichEditor($("mtgToolbar"), $("mtgContent"), $("mtgFontSize"));
 
-// ================= 專案排程 =================
-let SCHEDS = {}, SCHED_PROJECTS = [], curProj = null, curMs = -1;
+// ================= 專案排程（每專案可有多條時間線／畫布）=================
+let CANVASES = [], SCHED_PROJECTS = [], curProj = null, curCanvasId = null, curMs = -1;
 const dayMs = 86400000;
 const parseD = d => new Date(d + "T00:00:00");
 const fmtMD = t => { const d = new Date(t); return (d.getMonth()+1) + "/" + d.getDate(); };
 const PAD = 40, PPD = 15;
+const uuid = () => (crypto.randomUUID ? crypto.randomUUID()
+  : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,c=>{const r=Math.random()*16|0;return (c==="x"?r:(r&0x3|0x8)).toString(16);}));
 
 function initSched(visible){
   SCHED_PROJECTS = visible.map(r=>r.name);
@@ -1286,6 +1300,9 @@ function initSched(visible){
     ? SCHED_PROJECTS.map(n=>`<option>${esc(n)}</option>`).join("")
     : `<option value="">（無可檢視的專案）</option>`;
   const ro = !IS_OWNER;                 // 工程師唯讀
+  $("scAddCanvas").classList.toggle("hidden", ro);
+  $("scDelCanvas").classList.toggle("hidden", ro);
+  $("scNameWrap").classList.toggle("hidden", ro);
   $("scAddBtn").classList.toggle("hidden", ro);
   $("scSaveBtn").classList.toggle("hidden", ro);
   $("scStart").disabled = ro; $("scEnd").disabled = ro;
@@ -1294,39 +1311,58 @@ function initSched(visible){
 }
 
 async function loadSchedules(){
-  const {data, error} = await sb.from("project_schedules").select("*");
-  SCHEDS = {};
+  const {data, error} = await sb.from("project_schedules").select("*").order("sort",{ascending:true}).order("created_at",{ascending:true});
+  CANVASES = [];
   if(error) console.warn("project_schedules 讀取失敗：", error.message);
-  else (data||[]).forEach(r=>{ if(!Array.isArray(r.milestones)) r.milestones=[]; SCHEDS[r.category]=r; });
+  else CANVASES = (data||[]).map(r=>{ if(!Array.isArray(r.milestones)) r.milestones=[]; return r; });
 }
 
-function getSched(cat){
-  if(!SCHEDS[cat]) SCHEDS[cat] = {category:cat, start_date:null, end_date:null, general_note:"", milestones:[]};
-  if(!Array.isArray(SCHEDS[cat].milestones)) SCHEDS[cat].milestones = [];
-  return SCHEDS[cat];
-}
-function curMsObj(){ return (curProj!=null && curMs>=0) ? getSched(curProj).milestones[curMs] : null; }
+const canvasesOf = cat => CANVASES.filter(c=>c.category===cat);
+const curCanvas = () => CANVASES.find(c=>c.id===curCanvasId) || null;
+function curMsObj(){ const c=curCanvas(); return (c && curMs>=0) ? c.milestones[curMs] : null; }
 
 function openProject(cat){
-  curProj = cat; curMs = -1;
-  const s = getSched(cat);
-  $("scStart").value = s.start_date || "";
-  $("scEnd").value   = s.end_date || "";
+  curProj = cat;
+  buildCanvasDropdown();
+  const list = canvasesOf(cat);
+  openCanvas(list.length ? list[0].id : null);
+}
+function buildCanvasDropdown(){
+  const list = canvasesOf(curProj);
+  $("scCanvas").innerHTML = list.length
+    ? list.map(c=>`<option value="${c.id}">${esc(c.name||"未命名時間線")}</option>`).join("")
+    : `<option value="">（尚無時間線）</option>`;
+  if(curCanvasId) $("scCanvas").value = curCanvasId;
+}
+function openCanvas(id){
+  curCanvasId = id; curMs = -1;
+  const c = curCanvas();
+  $("scCanvas").value = id || "";
+  $("scCanvasName").value = c ? (c.name||"") : "";
+  $("scStart").value = c ? (c.start_date||"") : "";
+  $("scEnd").value   = c ? (c.end_date||"") : "";
+  const none = !c;
+  $("scDelCanvas").disabled = none;
+  $("scAddBtn").disabled = none;
+  $("scSaveBtn").disabled = none;
   selectSchedContent(-1);
   buildSchedTimeline();
 }
 
 function buildSchedTimeline(){
   const track = $("scTrack");
-  if(!curProj){ track.innerHTML=""; track.style.width="100%"; return; }
-  const s = getSched(curProj);
-  if(!s.start_date || !s.end_date){
-    track.innerHTML = '<div class="hint" style="padding:20px;color:var(--muted)">設定專案開始與結束日期後即可顯示時間軸。</div>';
+  const c = curCanvas();
+  if(!c){
+    track.innerHTML = `<div class="hint" style="padding:20px;color:var(--muted)">${IS_OWNER?'此專案還沒有時間線，點「＋ 新增時間線」建立。':'此專案尚無排程。'}</div>`;
     track.style.width="100%"; return;
   }
-  let start = parseD(s.start_date).getTime(), end = parseD(s.end_date).getTime();
+  if(!c.start_date || !c.end_date){
+    track.innerHTML = '<div class="hint" style="padding:20px;color:var(--muted)">設定開始與結束日期後即可顯示時間軸。</div>';
+    track.style.width="100%"; return;
+  }
+  let start = parseD(c.start_date).getTime(), end = parseD(c.end_date).getTime();
   if(end < start){ const t=start; start=end; end=t; }
-  s.milestones.forEach(m=>{ if(m.date){ const t=parseD(m.date).getTime(); if(t<start)start=t; if(t>end)end=t; }});
+  c.milestones.forEach(m=>{ if(m.date){ const t=parseD(m.date).getTime(); if(t<start)start=t; if(t>end)end=t; }});
   const totalDays = Math.max(1, Math.round((end-start)/dayMs));
   const width = PAD*2 + totalDays*PPD;
   const x = t => PAD + Math.round((t-start)/dayMs)*PPD;
@@ -1334,7 +1370,7 @@ function buildSchedTimeline(){
   for(let t=start; t<=end+dayMs; t+=7*dayMs){
     html += `<div class="tick-dot" style="left:${x(t)}px"></div><div class="tick-date" style="left:${x(t)}px">${fmtMD(t)}</div>`;
   }
-  s.milestones.forEach((m,i)=>{
+  c.milestones.forEach((m,i)=>{
     if(!m.date) return;
     const px = x(parseD(m.date).getTime());
     html += `<div class="ms-stem" style="left:${px}px;top:74px;height:70px"></div>`;
@@ -1347,10 +1383,9 @@ function buildSchedTimeline(){
 }
 
 function schedEditorToMem(){
-  if(curProj==null) return;
-  const s = getSched(curProj);
-  if(curMs === -1) s.general_note = $("scEditor").innerHTML;
-  else if(s.milestones[curMs]) s.milestones[curMs].content = $("scEditor").innerHTML;
+  const c = curCanvas(); if(!c) return;
+  if(curMs === -1) c.general_note = $("scEditor").innerHTML;
+  else if(c.milestones[curMs]) c.milestones[curMs].content = $("scEditor").innerHTML;
 }
 function setSchedEditor(html){
   const h = html || "";
@@ -1360,14 +1395,15 @@ function setSchedEditor(html){
 function selectSchedContent(i){
   schedEditorToMem();
   curMs = i;
-  const s = getSched(curProj);
+  const c = curCanvas();
   document.querySelectorAll("#scTrack .ms").forEach(x=>x.classList.remove("sel"));
+  if(!c){ $("scSelName").textContent="整體專案"; $("scMsEdit").classList.add("hidden"); setSchedEditor(""); return; }
   if(i === -1){
     $("scSelName").textContent = "整體專案";
     $("scMsEdit").classList.add("hidden");
-    setSchedEditor(s.general_note || "");
+    setSchedEditor(c.general_note || "");
   }else{
-    const m = s.milestones[i];
+    const m = c.milestones[i];
     $("scSelName").textContent = m.label || "（未命名）";
     $("scMsEdit").classList.toggle("hidden", !IS_OWNER);
     $("scEdLabel").value = m.label||""; $("scEdDate").value = m.date||""; $("scEdColor").value = m.color||"#ffffff";
@@ -1376,39 +1412,60 @@ function selectSchedContent(i){
   }
 }
 
-$("scProj").addEventListener("change", ()=> openProject($("scProj").value));
-$("scStart").addEventListener("change", ()=>{ if(curProj!=null){ getSched(curProj).start_date=$("scStart").value||null; buildSchedTimeline(); }});
-$("scEnd").addEventListener("change",   ()=>{ if(curProj!=null){ getSched(curProj).end_date=$("scEnd").value||null; buildSchedTimeline(); }});
+$("scProj").addEventListener("change", ()=>{ schedEditorToMem(); openProject($("scProj").value); });
+$("scCanvas").addEventListener("change", ()=>{ schedEditorToMem(); openCanvas($("scCanvas").value); });
+$("scCanvasName").addEventListener("input", ()=>{ const c=curCanvas(); if(c){ c.name=$("scCanvasName").value; buildCanvasDropdown(); }});
+$("scAddCanvas").addEventListener("click", ()=>{
+  if(curProj==null) return;
+  schedEditorToMem();
+  const sort = canvasesOf(curProj).reduce((mx,c)=>Math.max(mx, c.sort||0), 0) + 1;
+  const nc = { id:uuid(), category:curProj, name:"新時間線", start_date:null, end_date:null, general_note:"", milestones:[], sort };
+  CANVASES.push(nc);
+  buildCanvasDropdown();
+  openCanvas(nc.id);
+  $("scCanvasName").focus(); $("scCanvasName").select();
+});
+$("scDelCanvas").addEventListener("click", async ()=>{
+  const c = curCanvas(); if(!c) return;
+  if(!confirm(`刪除時間線「${c.name||""}」？此動作無法復原。`)) return;
+  const {error} = await sb.from("project_schedules").delete().eq("id", c.id);
+  if(error && !/No rows/i.test(error.message)){ alert("刪除失敗："+error.message); return; }
+  CANVASES = CANVASES.filter(x=>x.id!==c.id);
+  const list = canvasesOf(curProj);
+  buildCanvasDropdown();
+  openCanvas(list.length ? list[0].id : null);
+});
+
+$("scStart").addEventListener("change", ()=>{ const c=curCanvas(); if(c){ c.start_date=$("scStart").value||null; buildSchedTimeline(); }});
+$("scEnd").addEventListener("change",   ()=>{ const c=curCanvas(); if(c){ c.end_date=$("scEnd").value||null; buildSchedTimeline(); }});
 $("scEdLabel").addEventListener("input", ()=>{ const m=curMsObj(); if(m){ m.label=$("scEdLabel").value; $("scSelName").textContent=m.label||"（未命名）"; buildSchedTimeline(); }});
 $("scEdDate").addEventListener("change", ()=>{ const m=curMsObj(); if(m){ m.date=$("scEdDate").value; buildSchedTimeline(); }});
 $("scEdColor").addEventListener("input", ()=>{ const m=curMsObj(); if(m){ m.color=$("scEdColor").value; buildSchedTimeline(); }});
 $("scEdDel").addEventListener("click", ()=>{
-  if(curMs<0) return;
-  const s=getSched(curProj);
-  if(!confirm(`刪除里程碑「${s.milestones[curMs].label||""}」？`)) return;
-  s.milestones.splice(curMs,1); selectSchedContent(-1); buildSchedTimeline();
+  const c=curCanvas(); if(!c || curMs<0) return;
+  if(!confirm(`刪除里程碑「${c.milestones[curMs].label||""}」？`)) return;
+  c.milestones.splice(curMs,1); selectSchedContent(-1); buildSchedTimeline();
 });
 $("scAddBtn").addEventListener("click", ()=>{
-  if(curProj==null) return;
+  const c=curCanvas(); if(!c) return;
   schedEditorToMem();
-  const s = getSched(curProj);
-  const times = s.milestones.filter(m=>m.date).map(m=>parseD(m.date).getTime());
-  const base = times.length ? Math.max(...times) : (s.start_date ? parseD(s.start_date).getTime() : Date.now());
+  const times = c.milestones.filter(m=>m.date).map(m=>parseD(m.date).getTime());
+  const base = times.length ? Math.max(...times) : (c.start_date ? parseD(c.start_date).getTime() : Date.now());
   const d = new Date(base + 7*dayMs);
   const ds = d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
-  s.milestones.push({label:"新里程碑", date:ds, color:"#ffffff", content:""});
+  c.milestones.push({label:"新里程碑", date:ds, color:"#ffffff", content:""});
   buildSchedTimeline();
-  selectSchedContent(s.milestones.length-1);
+  selectSchedContent(c.milestones.length-1);
   $("scEdLabel").focus();
 });
 $("scSaveBtn").addEventListener("click", async ()=>{
-  if(!IS_OWNER || curProj==null) return;
+  const c=curCanvas(); if(!IS_OWNER || !c) return;
   schedEditorToMem();
-  const s = getSched(curProj);
-  const payload = { category: curProj, start_date: s.start_date||null, end_date: s.end_date||null,
-                    general_note: s.general_note||null, milestones: s.milestones||[] };
+  const payload = { id:c.id, category:c.category, name:c.name||"未命名時間線",
+                    start_date:c.start_date||null, end_date:c.end_date||null,
+                    general_note:c.general_note||null, milestones:c.milestones||[], sort:c.sort||0 };
   $("scSaveBtn").disabled = true; $("scSaveHint").textContent = "儲存中…";
-  const {error} = await sb.from("project_schedules").upsert(payload, {onConflict:"category"});
+  const {error} = await sb.from("project_schedules").upsert(payload, {onConflict:"id"});
   $("scSaveBtn").disabled = false;
   if(error){ $("scSaveHint").textContent = "儲存失敗："+error.message; return; }
   $("scSaveHint").textContent = "已儲存 ✓";
