@@ -1088,9 +1088,10 @@ function renderReq(system){
 // 路由：#/ 首頁、#/req/<系統>、#/mtg/<系統>
 function routeReq(){
   const h = decodeURIComponent(location.hash.replace(/^#/,""));
+  schedEditorToMem();   // 切換前先把排程編輯內容存進記憶，避免遺失
   const reqWant = h.startsWith("/req/") ? h.slice(5) : null;
   const mtgWant = h.startsWith("/mtg/") ? h.slice(5) : null;
-  const onSched = (h === "/sched");
+  const onSched = (h === "/sched" || h.startsWith("/sched/"));
   curSystem    = (reqWant && REQNAMES.includes(reqWant)) ? reqWant : null;
   curMtgSystem = (mtgWant && REQNAMES.includes(mtgWant)) ? mtgWant : null;
   const onReq = !!curSystem, onMtg = !!curMtgSystem;
@@ -1109,7 +1110,7 @@ function routeReq(){
   });
   if(onReq) renderReq(curSystem);
   if(onMtg) renderMtg(curMtgSystem);
-  if(onSched) buildSchedTimeline();
+  if(onSched) applySchedRoute(h);
   window.scrollTo(0,0);
 }
 
@@ -1323,6 +1324,7 @@ function curMsObj(){ const c=curCanvas(); return (c && curMs>=0) ? c.milestones[
 
 function openProject(cat){
   curProj = cat;
+  $("scProj").value = cat;
   buildCanvasDropdown();
   const list = canvasesOf(cat);
   openCanvas(list.length ? list[0].id : null);
@@ -1412,8 +1414,24 @@ function selectSchedContent(i){
   }
 }
 
-$("scProj").addEventListener("change", ()=>{ schedEditorToMem(); openProject($("scProj").value); });
-$("scCanvas").addEventListener("change", ()=>{ schedEditorToMem(); openCanvas($("scCanvas").value); });
+// 專案/時間線改用網址 hash 驅動，切走再回來或重整都會停在原處
+$("scProj").addEventListener("change", function(){ location.hash = "#/sched/" + encodeURIComponent(this.value); });
+$("scCanvas").addEventListener("change", function(){ if(curProj!=null) location.hash = "#/sched/" + encodeURIComponent(curProj) + "/" + this.value; });
+
+function applySchedRoute(h){
+  const parts = h.split("/");                 // ["","sched", proj?, canvasId?]
+  const wantProj   = parts[2] || null;
+  const wantCanvas = parts[3] || null;
+  const proj = (wantProj && SCHED_PROJECTS.includes(wantProj)) ? wantProj
+             : (curProj && SCHED_PROJECTS.includes(curProj)) ? curProj
+             : (SCHED_PROJECTS[0] || null);
+  if(proj && (proj !== curProj || !curCanvas())) openProject(proj);
+  if(wantCanvas && wantCanvas !== curCanvasId && canvasesOf(proj).some(c=>c.id===wantCanvas)) openCanvas(wantCanvas);
+  else buildSchedTimeline();
+  // 把實際狀態寫回網址（不新增歷史），重整後可還原
+  const norm = "#/sched" + (proj ? "/" + encodeURIComponent(proj) + (curCanvasId ? "/" + curCanvasId : "") : "");
+  if(location.hash !== norm) history.replaceState(null, "", norm);
+}
 $("scCanvasName").addEventListener("input", ()=>{ const c=curCanvas(); if(c){ c.name=$("scCanvasName").value; buildCanvasDropdown(); }});
 $("scAddCanvas").addEventListener("click", ()=>{
   if(curProj==null) return;
