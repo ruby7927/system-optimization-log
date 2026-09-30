@@ -634,6 +634,7 @@ if(sb){
   setLoginMsg("尚未設定 Supabase，請先編輯 config.js 填入 url 與 anonKey","err");
 }
 
+let APP_STARTED = false;
 function enterApp(user){
   CURRENT_USER = user;
   // 唯讀（公用）帳號清單內 → 唯讀；其餘（含擁有者）可編輯
@@ -644,11 +645,15 @@ function enterApp(user){
   $("loginView").classList.add("hidden");
   $("appView").classList.remove("hidden");
   $("who").textContent = user.email;
+  // 只在第一次登入時載入/建立畫面；之後的登入事件(token 更新、切回分頁)不重載，
+  // 以免專案排程被重置、未儲存的時間線消失
+  if(APP_STARTED) return;
+  APP_STARTED = true;
   loadData();
   initReq();
 }
 function leaveApp(){
-  CURRENT_USER = null; ALL = [];
+  CURRENT_USER = null; ALL = []; APP_STARTED = false;
   $("appView").classList.add("hidden");
   $("loginView").classList.remove("hidden");
   $("password").value = "";
@@ -1459,6 +1464,7 @@ $("scAddCanvas").addEventListener("click", ()=>{
   CANVASES.push(nc);
   buildCanvasDropdown();
   openCanvas(nc.id);
+  history.replaceState(null, "", "#/sched/" + encodeURIComponent(curProj) + "/" + nc.id);
   $("scCanvasName").focus(); $("scCanvasName").select();
 });
 $("scDelCanvas").addEventListener("click", async ()=>{
