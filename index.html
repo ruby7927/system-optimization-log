@@ -1368,18 +1368,36 @@ function buildSchedTimeline(){
   const totalDays = Math.max(1, Math.round((end-start)/dayMs));
   const width = PAD*2 + totalDays*PPD;
   const x = t => PAD + Math.round((t-start)/dayMs)*PPD;
-  let html = `<div class="axis-line" style="width:${width-PAD*2}px"></div>`;
+
+  // 里程碑自動分層：日期相近會往上疊一層，避免方塊左右重疊
+  const boxW = 100, gap = 14, laneH = 66, topBase = 14;
+  const items = c.milestones.map((m,i)=>({m,i})).filter(o=>o.m.date)
+                 .sort((a,b)=> parseD(a.m.date) - parseD(b.m.date));
+  const laneRight = [];
+  items.forEach(o=>{
+    o.x = x(parseD(o.m.date).getTime());
+    const left = o.x - boxW/2;
+    let lane = 0;
+    while(lane < laneRight.length && left < laneRight[lane] + gap) lane++;
+    o.lane = lane;
+    laneRight[lane] = o.x + boxW/2;
+  });
+  const numLanes = Math.max(1, laneRight.length);
+  const lineTop = topBase + numLanes*laneH + 8;      // 軸線 Y（依層數往下）
+  const height  = lineTop + 46;                       // 容納圓點與日期
+
+  let html = `<div class="axis-line" style="top:${lineTop}px;width:${width-PAD*2}px"></div>`;
   for(let t=start; t<=end+dayMs; t+=7*dayMs){
-    html += `<div class="tick-dot" style="left:${x(t)}px"></div><div class="tick-date" style="left:${x(t)}px">${fmtMD(t)}</div>`;
+    html += `<div class="tick-dot" style="top:${lineTop-5}px;left:${x(t)}px"></div>`;
+    html += `<div class="tick-date" style="top:${lineTop+16}px;left:${x(t)}px">${fmtMD(t)}</div>`;
   }
-  c.milestones.forEach((m,i)=>{
-    if(!m.date) return;
-    const px = x(parseD(m.date).getTime());
-    html += `<div class="ms-stem" style="left:${px}px;top:74px;height:70px"></div>`;
-    html += `<div class="ms-mark" style="left:${px}px;background:${esc(m.color||'#fff')}"></div>`;
-    html += `<div class="ms ${i===curMs?'sel':''}" data-i="${i}" style="left:${px}px;background:${esc(m.color||'#fff')}">${esc(m.label||'')}<span class="ms-date">${esc(m.date)}</span></div>`;
+  items.forEach(o=>{
+    const top = topBase + o.lane*laneH;
+    html += `<div class="ms-mark" style="top:${lineTop-6}px;left:${o.x}px;background:${esc(o.m.color||'#fff')}"></div>`;
+    html += `<div class="ms ${o.i===curMs?'sel':''}" data-i="${o.i}" style="top:${top}px;left:${o.x}px;background:${esc(o.m.color||'#fff')}">${esc(o.m.label||'')}<span class="ms-date">${esc(o.m.date)}</span></div>`;
   });
   track.style.width = width + "px";
+  track.style.height = height + "px";
   track.innerHTML = html;
   track.querySelectorAll(".ms").forEach(el=> el.addEventListener("click", ()=> selectSchedContent(+el.dataset.i)));
 }
