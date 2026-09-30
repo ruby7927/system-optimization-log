@@ -660,9 +660,9 @@ if(sb){
 let APP_STARTED = false;
 function enterApp(user){
   CURRENT_USER = user;
-  // 唯讀（公用）帳號清單內 → 唯讀；其餘（含擁有者）可編輯
-  const ro = ((window.APP_CONFIG && window.APP_CONFIG.readonlyEmails) || []).map(e=>String(e).toLowerCase());
-  IS_OWNER = !ro.includes(String(user.email).toLowerCase());
+  // 管理者名單內＝可編輯；其餘一律唯讀（實際可見範圍由資料庫依網域控管）
+  const owners = ((window.APP_CONFIG && window.APP_CONFIG.ownerEmails) || []).map(e=>String(e).toLowerCase());
+  IS_OWNER = owners.includes(String(user.email).toLowerCase());
   document.body.classList.toggle("readonly", !IS_OWNER);
   $("roBadge").classList.toggle("hidden", IS_OWNER);
   $("loginView").classList.add("hidden");
