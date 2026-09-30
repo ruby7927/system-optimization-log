@@ -1507,11 +1507,12 @@ $("scSaveBtn").addEventListener("click", async ()=>{
                     start_date:c.start_date||null, end_date:c.end_date||null,
                     general_note:c.general_note||null, milestones:c.milestones||[], sort:c.sort||0 };
   $("scSaveBtn").disabled = true; $("scSaveHint").textContent = "儲存中…";
-  const {error} = await sb.from("project_schedules").upsert(payload, {onConflict:"id"});
+  const {data, error} = await sb.from("project_schedules").upsert(payload, {onConflict:"id"}).select();
   $("scSaveBtn").disabled = false;
-  if(error){ $("scSaveHint").textContent = "儲存失敗："+error.message; return; }
+  if(error){ console.error("排程儲存失敗", error); $("scSaveHint").textContent = "儲存失敗："+error.message; return; }
+  if(!data || !data.length){ $("scSaveHint").textContent = "儲存沒有生效（可能是權限問題），請截圖回報"; return; }
   $("scSaveHint").textContent = "已儲存 ✓";
-  setTimeout(()=>{ $("scSaveHint").textContent=""; }, 2500);
+  setTimeout(()=>{ $("scSaveHint").textContent=""; }, 3000);
 });
 
 initRichEditor($("scTb"), $("scEditor"), $("scFontSize"));
