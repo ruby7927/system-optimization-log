@@ -788,7 +788,7 @@ $("clearBtn").addEventListener("click", ()=>{
 // ================= 新增 / 編輯 =================
 $("newBtn").addEventListener("click", ()=> openEdit(null));
 $("cancelBtn").addEventListener("click", closeModal);
-$("editOverlay").addEventListener("click", e=>{ if(e.target.id==="editOverlay") closeModal(); });
+// 不因點背景而關閉（避免輸入到一半誤關遺失）；僅用「取消/儲存」關閉
 
 function openEdit(id){
   if(!IS_OWNER) return;   // 唯讀帳號不可編輯
@@ -1148,7 +1148,7 @@ function nowLocal(){ const d=new Date(); return `${d.getFullYear()}-${pad(d.getM
 
 $("addFileBtn").addEventListener("click", ()=>openFile(null));
 $("fileCancelBtn").addEventListener("click", ()=>$("fileOverlay").classList.add("hidden"));
-$("fileOverlay").addEventListener("click", e=>{ if(e.target.id==="fileOverlay") $("fileOverlay").classList.add("hidden"); });
+// 不因點背景而關閉（避免輸入到一半誤關遺失）
 
 function openFile(id){
   if(!IS_OWNER) return;
@@ -1255,7 +1255,7 @@ $("mtgClear").addEventListener("click", ()=>{ $("mtgFrom").value=""; $("mtgTo").
 
 $("addMtgBtn").addEventListener("click", ()=>openMtg(null));
 $("mtgCancelBtn").addEventListener("click", ()=>$("mtgOverlay").classList.add("hidden"));
-$("mtgOverlay").addEventListener("click", e=>{ if(e.target.id==="mtgOverlay") $("mtgOverlay").classList.add("hidden"); });
+// 不因點背景而關閉（避免輸入到一半誤關遺失）
 
 function openMtg(id){
   if(!IS_OWNER) return;
