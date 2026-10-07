@@ -307,6 +307,7 @@
           </div>
           <button class="btn-primary hidden" id="scAddCanvas">＋ 新增時間線</button>
           <button class="btn-danger hidden" id="scDelCanvas">刪除此時間線</button>
+          <button class="btn-ghost" id="scExportBtn">📄 匯出全部排程</button>
         </div>
         <div class="schbar">
           <div class="f">
@@ -1536,6 +1537,37 @@ $("scSaveBtn").addEventListener("click", async ()=>{
   if(!data || !data.length){ $("scSaveHint").textContent = "儲存沒有生效（可能是權限問題），請截圖回報"; return; }
   $("scSaveHint").textContent = "已儲存 ✓";
   setTimeout(()=>{ $("scSaveHint").textContent=""; }, 3000);
+});
+
+// 一次匯出所有專案、所有時間線（依目前可見範圍）
+$("scExportBtn").addEventListener("click", ()=>{
+  schedEditorToMem();
+  if(!CANVASES.length){ alert("目前沒有可匯出的排程"); return; }
+  const byCat = {};
+  CANVASES.forEach(c=>{ (byCat[c.category] = byCat[c.category] || []).push(c); });
+  const cats = Object.keys(byCat).sort();
+  let body = `<h1>專案排程</h1>
+    <div class="gen">產生時間：${new Date().toLocaleString("zh-TW")}　｜　共 ${cats.length} 個專案、${CANVASES.length} 條時間線</div>`;
+  cats.forEach(cat=>{
+    body += `<div style="font-size:16px;font-weight:700;margin:20px 0 8px;color:#2f49b0;border-bottom:1px solid #e0e4ee;padding-bottom:4px">${esc(cat)}</div>`;
+    byCat[cat].slice().sort((a,b)=>(a.sort||0)-(b.sort||0)).forEach(c=>{
+      const ms = (c.milestones||[]).slice().sort((a,b)=>String(a.date||"").localeCompare(String(b.date||"")));
+      body += `<div class="item">
+        <div class="h"><span class="cat">${esc(c.name||"未命名時間線")}</span>
+          <span class="d">期間：${c.start_date||"—"} ~ ${c.end_date||"—"}</span></div>
+        ${c.general_note?`<div class="desc">${renderDesc(c.general_note)}</div>`:""}
+        ${ms.length ? `<table style="margin-top:10px">
+          <tr><td class="k" style="width:92px">日期</td><td class="k" style="width:150px">里程碑</td><td class="k">內容</td></tr>
+          ${ms.map(m=>`<tr>
+            <td>${esc(m.date||"—")}</td>
+            <td><span style="display:inline-block;width:10px;height:10px;border-radius:2px;border:1px solid #ccc;margin-right:6px;background:${esc(m.color||'#fff')}"></span>${esc(m.label||"")}</td>
+            <td style="white-space:pre-wrap">${m.content?renderDesc(m.content):"—"}</td>
+          </tr>`).join("")}
+        </table>` : `<div class="meta" style="color:#999;margin-top:6px">（尚無里程碑）</div>`}
+      </div>`;
+    });
+  });
+  runPdf(body, `專案排程_${new Date().toISOString().slice(0,10)}.pdf`);
 });
 
 initRichEditor($("scTb"), $("scEditor"), $("scFontSize"));
