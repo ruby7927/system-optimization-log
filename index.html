@@ -949,6 +949,14 @@ function printStyle(){
     tr{ page-break-inside:avoid; }
     td{ padding:6px 8px; border:1px solid #e0e4ee; vertical-align:top; line-height:1.5; }
     td.k{ background:#f6f8fd; color:#666; width:96px; font-weight:bold; }
+    /* 排程里程碑：垂直時間線 */
+    .tl{ position:relative; margin:12px 0 2px; padding-left:18px; }
+    .tl::before{ content:""; position:absolute; left:5px; top:4px; bottom:4px; width:2px; background:#d4dcef; border-radius:1px; }
+    .tl-item{ position:relative; margin-bottom:11px; page-break-inside:avoid; }
+    .tl-item:last-child{ margin-bottom:0; }
+    .tl-dot{ position:absolute; left:-18px; top:1px; width:12px; height:12px; border-radius:50%; border:1px solid #99a6c8; }
+    .tl-date{ font-size:11px; color:#2f49b0; font-weight:bold; }
+    .tl-label{ font-size:13px; line-height:1.45; }
   </style>`;
 }
 function itemBlock(r){
@@ -1551,19 +1559,18 @@ $("scExportBtn").addEventListener("click", ()=>{
   cats.forEach(cat=>{
     body += `<div style="font-size:16px;font-weight:700;margin:20px 0 8px;color:#2f49b0;border-bottom:1px solid #e0e4ee;padding-bottom:4px">${esc(cat)}</div>`;
     byCat[cat].slice().sort((a,b)=>(a.sort||0)-(b.sort||0)).forEach(c=>{
-      const ms = (c.milestones||[]).slice().sort((a,b)=>String(a.date||"").localeCompare(String(b.date||"")));
+      const ms = (c.milestones||[]).filter(m=>m.date||m.label)
+                   .slice().sort((a,b)=>String(a.date||"").localeCompare(String(b.date||"")));
       body += `<div class="item">
         <div class="h"><span class="cat">${esc(c.name||"未命名時間線")}</span>
           <span class="d">期間：${c.start_date||"—"} ~ ${c.end_date||"—"}</span></div>
-        ${c.general_note?`<div class="desc">${renderDesc(c.general_note)}</div>`:""}
-        ${ms.length ? `<table style="margin-top:10px">
-          <tr><td class="k" style="width:92px">日期</td><td class="k" style="width:150px">里程碑</td><td class="k">內容</td></tr>
-          ${ms.map(m=>`<tr>
-            <td>${esc(m.date||"—")}</td>
-            <td><span style="display:inline-block;width:10px;height:10px;border-radius:2px;border:1px solid #ccc;margin-right:6px;background:${esc(m.color||'#fff')}"></span>${esc(m.label||"")}</td>
-            <td style="white-space:pre-wrap">${m.content?renderDesc(m.content):"—"}</td>
-          </tr>`).join("")}
-        </table>` : `<div class="meta" style="color:#999;margin-top:6px">（尚無里程碑）</div>`}
+        ${ms.length ? `<div class="tl">
+          ${ms.map(m=>`<div class="tl-item">
+            <div class="tl-dot" style="background:${esc(m.color||'#fff')}"></div>
+            <div class="tl-date">${esc(m.date||"—")}</div>
+            <div class="tl-label">${esc(m.label||"（未命名）")}</div>
+          </div>`).join("")}
+        </div>` : `<div class="meta" style="color:#999;margin-top:6px">（尚無里程碑）</div>`}
       </div>`;
     });
   });
