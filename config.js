@@ -19,6 +19,8 @@ window.APP_CONFIG = {
     { name: "Incident Reporting System", url: "" },
     { name: "請假系統",                  url: "" },
     { name: "採購系統",                  url: "" },
-    { name: "請假薪資系統",              url: "" }
+    { name: "請假薪資系統",              url: "" },
+    { name: "AI培訓官",                  url: "" },
+    { name: "SAGE",                      url: "" }
   ]
 };
